@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Detail View</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ==================== TOOLBAR ==================== */
+    #toolbar {
+      padding: 10px 16px;
+      background: #111;
+      border-bottom: 1px solid #1e1e1e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .filter-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    .pill {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #555;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .pill:hover { border-color: #444; color: #888; }
+    .pill.active { background: #0a1a2a; border-color: #0055aa; color: #4db3ff; }
+
+    .search-input {
+      padding: 6px 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-size: 12px;
+      font-family: inherit;
+      width: 220px;
+    }
+    .search-input:focus { outline: none; border-color: #0055aa; }
+
+    .sort-select {
+      padding: 6px 10px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #888;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .sort-select:focus { outline: none; border-color: #0055aa; }
+
+    .item-count {
+      margin-left: auto;
+      font-size: 10px;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    /* ==================== TABELLE ==================== */
+    #table-container {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .detail-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #0f0f0f;
+    }
+
+    .detail-table thead th {
+      padding: 10px 14px;
+      text-align: left;
+      color: #444;
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #1a1a1a;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .detail-table thead th:hover { color: #666; }
+    .detail-table thead th.sort-asc::after { content: ' ↑'; color: #4db3ff; }
+    .detail-table thead th.sort-desc::after { content: ' ↓'; color: #4db3ff; }
+
+    .detail-table tbody tr {
+      border-bottom: 1px solid #0f0f0f;
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+
+    .detail-table tbody tr:hover { background: #111; }
+    .detail-table tbody tr.selected { background: #0a1a2a; }
+
+    .detail-table td {
+      padding: 8px 14px;
+      color: #777;
+      vertical-align: middle;
+    }
+
+    .col-preview { width: 60px; }
+    .col-type { width: 70px; }
+    .col-name { color: #bbb; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-folder { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .col-size { text-align: right; font-family: 'Consolas', monospace; font-size: 10px; white-space: nowrap; }
+    .col-date { white-space: nowrap; font-size: 11px; }
+    .col-tags { max-width: 160px; }
+    .col-actions { white-space: nowrap; }
+
+    /* Preview-Thumbnail */
+    .preview-thumb {
+      width: 50px;
+      height: 38px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-thumb video,
+    .preview-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .type-tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .type-tag.video { background: rgba(0,102,204,0.2); color: #4499cc; }
+    .type-tag.image { background: rgba(76,175,80,0.2); color: #66aa66; }
+    .type-tag.unknown { background: rgba(80,80,80,0.2); color: #555; }
+
+    .tag-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      background: rgba(0,102,204,0.15);
+      border: 1px solid rgba(0,102,204,0.3);
+      border-radius: 3px;
+      font-size: 10px;
+      color: #4488bb;
+      margin-right: 3px;
+      margin-bottom: 2px;
+    }
+
+    .action-btn {
+      padding: 4px 10px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #888;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-right: 4px;
+    }
+    .action-btn:hover { border-color: #0066cc; color: #4db3ff; }
+
+    /* Status-Badge */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .status-badge.transcoded { background: rgba(76,175,80,0.2); color: #4a9a4a; }
+    .status-badge.needs-transcode { background: rgba(255,152,0,0.2); color: #cc8800; }
+
+    /* ==================== PAGINATION ==================== */
+    #pagination {
+      padding: 10px 16px;
+      background: #0d0d0d;
+      border-top: 1px solid #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .page-btn {
+      padding: 5px 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #555;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .page-btn:hover:not(:disabled) { border-color: #444; color: #888; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-info { font-size: 11px; color: #444; }
+
+    /* ==================== LEER-ZUSTAND ==================== */
+    #empty-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #333;
+      font-size: 14px;
+      gap: 10px;
+    }
+
+    #empty-state.visible { display: flex; }
+    #empty-state .empty-icon { font-size: 48px; }
+
+    /* ==================== CONTEXT MENU ==================== */
+    #context-menu {
+      display: none;
+      position: fixed;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+      min-width: 180px;
+      z-index: 10000;
+    }
+
+    .context-item { padding: 9px 14px; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+    .context-item:hover { background: #333; }
+    .context-separator { height: 1px; background: #444; margin: 3px 0; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="filter-pills">
+    <button class="pill active" data-t="all" onclick="setFilter('all')">Alle</button>
+    <button class="pill" data-t="video" onclick="setFilter('video')">🎬 Videos</button>
+    <button class="pill" data-t="image" onclick="setFilter('image')">🖼️ Bilder</button>
+    <button class="pill" data-t="unknown" onclick="setFilter('unknown')">❓ Unbekannt</button>
+  </div>
+
+  <input class="search-input" type="text" id="search-input" placeholder="Suche…" oninput="onSearch(this.value)">
+
+  <select class="sort-select" id="sort-select" onchange="onSortChange(this.value)">
+    <option value="name-asc">Name A–Z</option>
+    <option value="name-desc">Name Z–A</option>
+    <option value="created-desc">Datum (neu)</option>
+    <option value="created-asc">Datum (alt)</option>
+    <option value="size-desc">Größe (groß)</option>
+    <option value="size-asc">Größe (klein)</option>
+    <option value="folder-asc">Ordner A–Z</option>
+    <option value="type-asc">Typ</option>
+  </select>
+
+  <span class="item-count" id="item-count">—</span>
+</div>
+
+<div id="table-container">
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th class="col-preview">Vorschau</th>
+        <th class="col-type" onclick="setSortCol('type')">Typ</th>
+        <th onclick="setSortCol('name')">Dateiname</th>
+        <th onclick="setSortCol('folder')">Ordner</th>
+        <th onclick="setSortCol('size')" style="text-align:right">Größe</th>
+        <th onclick="setSortCol('date')">Datum</th>
+        <th>Tags</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody id="detail-tbody"></tbody>
+  </table>
+
+  <div id="empty-state">
+    <div class="empty-icon">📭</div>
+    <div>Keine Dateien geladen</div>
+    <div style="font-size:11px;color:#222">Lade eine media_data.json über den Laden-Tab</div>
+  </div>
+</div>
+
+<div id="pagination">
+  <button class="page-btn" id="btn-prev" onclick="changePage(-1)" disabled>← Zurück</button>
+  <span class="page-info" id="page-info">Seite 1 / 1</span>
+  <button class="page-btn" id="btn-next" onclick="changePage(1)" disabled>Weiter →</button>
+</div>
+
+<div id="context-menu">
+  <div class="context-item" data-action="play">▶️ In PotPlayer öffnen</div>
+  <div class="context-item" data-action="explorer">📁 Im Explorer zeigen</div>
+  <div class="context-separator"></div>
+  <div class="context-item" data-action="transcode">⚙️ Transkodieren</div>
+</div>
+
+<script>
+// ==================== GLOBALS ====================
+let state = null;
+let allItems = [];
+let filteredItems = [];
+let activeFilter = 'all';
+let searchQuery = '';
+let currentSortKey = 'name-asc';
+let currentSortCol = '';
+let currentPage = 1;
+const PAGE_SIZE = 100;
+
+let contextMenuItem = null;
+
+// ==================== INIT ====================
+function init() {
+  console.log('[DETAIL] Init');
+  state = parent.AppState.getInstance();
+
+  state.on('items-changed', onItemsChanged);
+  state.on('items-chunk-added', onChunkAdded);
+  state.on('items-cleared', onItemsCleared);
+
+  setupContextMenu();
+
+  if (state.getMediaItems().length > 0) {
+    allItems = [...state.getMediaItems()];
+    applyAll();
+  } else {
+    showEmptyState(true);
+  }
+}
+
+function onItemsChanged(items) {
+  allItems = [...(items || state.getMediaItems())];
+  applyAll();
+}
+
+function onChunkAdded(newItems) {
+  allItems.push(...newItems);
+  updateItemCount();
+  // Tabelle nur alle 5 Chunks aktualisieren um CPU zu schonen
+  if (allItems.length % (PAGE_SIZE / 2) < newItems.length) {
+    applyAll();
+  }
+}
+
+function onItemsCleared() {
+  allItems = [];
+  filteredItems = [];
+  renderTable();
+  showEmptyState(true);
+}
+
+// ==================== FILTER / SUCHE / SORT ====================
+function setFilter(type) {
+  activeFilter = type;
+  document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.t === type));
+  currentPage = 1;
+  applyAll();
+}
+
+function onSearch(q) {
+  searchQuery = q.trim().toLowerCase();
+  currentPage = 1;
+  applyAll();
+}
+
+function onSortChange(key) {
+  currentSortKey = key;
+  currentPage = 1;
+  applyAll();
+}
+
+function setSortCol(col) {
+  const mapping = {
+    name:   currentSortKey === 'name-asc' ? 'name-desc' : 'name-asc',
+    folder: currentSortKey === 'folder-asc' ? 'folder-desc' : 'folder-asc',
+    size:   currentSortKey === 'size-desc' ? 'size-asc' : 'size-desc',
+    date:   currentSortKey === 'created-desc' ? 'created-asc' : 'created-desc',
+    type:   currentSortKey === 'type-asc' ? 'type-desc' : 'type-asc',
+  };
+  if (mapping[col]) {
+    currentSortKey = mapping[col];
+    document.getElementById('sort-select').value = currentSortKey;
+    currentPage = 1;
+    applyAll();
+  }
+}
+
+function applyAll() {
+  let result = [...allItems];
+
+  if (activeFilter !== 'all') {
+    result = result.filter(i => i.type === activeFilter);
+  }
+
+  if (searchQuery) {
+    result = result.filter(i =>
+      (i.fileName || '').toLowerCase().includes(searchQuery) ||
+      (i.folderPath || '').toLowerCase().includes(searchQuery) ||
+      (i.tags || []).some(t => t.toLowerCase().includes(searchQuery))
+    );
+  }
+
+  filteredItems = sortItems(result, currentSortKey);
+  renderTable();
+  updateItemCount();
+  showEmptyState(filteredItems.length === 0 && allItems.length === 0);
+}
+
+function sortItems(items, key) {
+  const s = [...items];
+  switch (key) {
+    case 'name-asc':      return s.sort((a,b) => (a.fileName||'').localeCompare(b.fileName||''));
+    case 'name-desc':     return s.sort((a,b) => (b.fileName||'').localeCompare(a.fileName||''));
+    case 'created-desc':  return s.sort((a,b) => (b.created||0) - (a.created||0));
+    case 'created-asc':   return s.sort((a,b) => (a.created||0) - (b.created||0));
+    case 'size-desc':     return s.sort((a,b) => (b.size||0) - (a.size||0));
+    case 'size-asc':      return s.sort((a,b) => (a.size||0) - (b.size||0));
+    case 'folder-asc':    return s.sort((a,b) => (a.folderPath||'').localeCompare(b.folderPath||''));
+    case 'folder-desc':   return s.sort((a,b) => (b.folderPath||'').localeCompare(a.folderPath||''));
+    case 'type-asc':      return s.sort((a,b) => (a.type||'').localeCompare(b.type||''));
+    case 'type-desc':     return s.sort((a,b) => (b.type||'').localeCompare(a.type||''));
+    default: return s;
+  }
+}
+
+// ==================== TABELLE RENDERN ====================
+function renderTable() {
+  const tbody = document.getElementById('detail-tbody');
+  tbody.innerHTML = '';
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, filteredItems.length);
+
+  for (let i = start; i < end; i++) {
+    const item = filteredItems[i];
+    tbody.appendChild(createRow(item));
+  }
+
+  updatePagination();
+}
+
+function createRow(item) {
+  const tr = document.createElement('tr');
+
+  const typeClass = item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'unknown';
+  const typeLabel = item.type === 'video' ? '🎬 Video' : item.type === 'image' ? '🖼️ Bild' : '❓';
+
+  const tagsHtml = (item.tags || []).map(t => `<span class="tag-chip">${t}</span>`).join('') || '—';
+
+  let statusHtml = '';
+  if (item.needsTranscode && !item.transcoded) {
+    statusHtml = '<span class="status-badge needs-transcode">Transcode</span>';
+  } else if (item.transcoded) {
+    statusHtml = '<span class="status-badge transcoded">Transkodiert</span>';
+  }
+
+  tr.innerHTML = `
+    <td class="col-preview"><div class="preview-thumb" data-path="${item.path || ''}" data-type="${item.type}"></div></td>
+    <td class="col-type"><span class="type-tag ${typeClass}">${typeLabel}</span>${statusHtml ? '<br>' + statusHtml : ''}</td>
+    <td class="col-name" title="${item.path || ''}">${item.fileName || '—'}</td>
+    <td class="col-folder" title="${item.folderPath || ''}">${item.folderPath || '—'}</td>
+    <td class="col-size">${fmtBytes(item.size)}</td>
+    <td class="col-date">${fmtDate(item.created)}</td>
+    <td class="col-tags">${tagsHtml}</td>
+    <td class="col-actions">
+      ${item.type === 'video' ? '<button class="action-btn" onclick="playItem(event)">▶</button>' : ''}
+      <button class="action-btn" onclick="showInExplorer(event)">📁</button>
+    </td>
+  `;
+
+  // Lazy-load Vorschau beim Hover auf die Zeile
+  const previewThumb = tr.querySelector('.preview-thumb');
+  tr.addEventListener('mouseenter', () => loadPreview(previewThumb, item), { once: true });
+
+  tr.addEventListener('click', () => {
+    document.querySelectorAll('.detail-table tbody tr.selected').forEach(r => r.classList.remove('selected'));
+    tr.classList.add('selected');
+  });
+
+  tr.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e, item);
+  });
+
+  // Aktions-Buttons: item aus Closure holen
+  const playBtn = tr.querySelector('.action-btn');
+  if (playBtn && item.type === 'video') {
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      parent.window.electron.invoke('open-with-potplayer', item.path);
+    });
+  }
+
+  const explBtn = tr.querySelectorAll('.action-btn');
+  const explorerBtn = explBtn[item.type === 'video' ? 1 : 0];
+  if (explorerBtn) {
+    explorerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      parent.window.electron.invoke('show-in-explorer', item.path);
+    });
+  }
+
+  return tr;
+}
+
+// Vorschau-Thumbnail bei Hover lazy laden
+function loadPreview(thumbEl, item) {
+  if (!item.path) return;
+
+  const url = buildFileUrl(item.path);
+
+  if (item.type === 'video') {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'metadata';
+    video.src = url;
+    thumbEl.appendChild(video);
+  } else if (item.type === 'image') {
+    const img = document.createElement('img');
+    img.src = url;
+    img.onerror = () => { thumbEl.textContent = '🖼️'; };
+    thumbEl.appendChild(img);
+  }
+}
+
+// Inline onclick-Handler (werden durch Event Listener in createRow überschrieben — diese sind Fallbacks)
+function playItem(e) { e.stopPropagation(); }
+function showInExplorer(e) { e.stopPropagation(); }
+
+// ==================== KONTEXT-MENÜ ====================
+function setupContextMenu() {
+  const menu = document.getElementById('context-menu');
+
+  menu.addEventListener('click', (e) => {
+    const action = e.target.dataset.action;
+    if (!action || !contextMenuItem) return;
+    handleContextAction(action, contextMenuItem);
+    hideContextMenu();
+  });
+
+  document.addEventListener('click', hideContextMenu);
+}
+
+function showContextMenu(e, item) {
+  const menu = document.getElementById('context-menu');
+  contextMenuItem = item;
+  menu.style.display = 'block';
+  menu.style.left = e.pageX + 'px';
+  menu.style.top = e.pageY + 'px';
+}
+
+function hideContextMenu() {
+  document.getElementById('context-menu').style.display = 'none';
+  contextMenuItem = null;
+}
+
+async function handleContextAction(action, item) {
+  switch (action) {
+    case 'play':
+      if (item.type === 'video') await parent.window.electron.invoke('open-with-potplayer', item.path);
+      break;
+    case 'explorer':
+      await parent.window.electron.invoke('show-in-explorer', item.path);
+      break;
+    case 'transcode':
+      if (item.type === 'video' && !item.transcoded) await parent.window.electron.invoke('transcode-video', item.path);
+      break;
+  }
+}
+
+// ==================== PAGINATION ====================
+function changePage(d) {
+  const max = Math.ceil(filteredItems.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(currentPage + d, max));
+  renderTable();
+  document.getElementById('table-container').scrollTop = 0;
+}
+
+function updatePagination() {
+  const max = Math.ceil(filteredItems.length / PAGE_SIZE) || 1;
+  document.getElementById('page-info').textContent = `Seite ${currentPage} / ${max}`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= max;
+}
+
+function updateItemCount() {
+  const total = allItems.length;
+  const shown = filteredItems.length;
+  document.getElementById('item-count').textContent =
+    shown !== total ? `${fmt(shown)} / ${fmt(total)} Dateien` : `${fmt(total)} Dateien`;
+}
+
+function showEmptyState(visible) {
+  document.getElementById('empty-state').classList.toggle('visible', visible);
+  document.getElementById('table-container').style.overflow = visible ? 'hidden' : 'auto';
+}
+
+// ==================== HILFSFUNKTIONEN ====================
+function buildFileUrl(rawPath) {
+  if (!rawPath) return '';
+  if (rawPath.startsWith('file://')) return rawPath;
+  let normalized = rawPath.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  const encoded = parts.map(part => part.endsWith(':') ? part : encodeURIComponent(part)).join('/');
+  return `file:///${encoded}`;
+}
+
+function fmt(n) { return n != null ? n.toLocaleString('de-DE') : '—'; }
+
+function fmtBytes(b) {
+  if (!b) return '—';
+  const k = 1024;
+  const s = ['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Scanner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    /* ==================== SEKTIONEN ==================== */
+    .section {
+      padding: 20px 28px;
+      border-bottom: 1px solid #141414;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #333;
+      margin-bottom: 14px;
+    }
+
+    /* ==================== BUTTONS ==================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: #0066cc; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #0077ee; transform: translateY(-1px); }
+    .btn-green { background: #1a4a1a; border: 1px solid #2a7a2a; color: #4db34d; }
+    .btn-green:hover:not(:disabled) { background: #1e5a1e; border-color: #3a9a3a; }
+    .btn-secondary { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; }
+    .btn-secondary:hover:not(:disabled) { border-color: #555; color: #bbb; }
+    .btn-danger { background: #2a1010; border: 1px solid #5a2020; color: #ff6b6b; }
+    .btn-danger:hover:not(:disabled) { background: #3a1212; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+    /* ==================== ORDNER-AUSWAHL ==================== */
+    .folder-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .path-display {
+      flex: 1;
+      min-width: 200px;
+      padding: 9px 13px;
+      background: #0d0d0d;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #555;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: 'Consolas', monospace;
+    }
+
+    .path-display.active { color: #4db3ff; border-color: #1a3a5c; background: #0a1a2a; }
+
+    /* Ziel-JSON */
+    .json-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .json-label { font-size: 11px; color: #444; white-space: nowrap; }
+
+    .json-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 7px 12px;
+      background: #0d0d0d;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #667;
+      font-family: 'Consolas', monospace;
+    }
+
+    .json-input:focus { outline: none; border-color: #0055aa; color: #aaa; }
+
+    /* Modus-Schalter */
+    .mode-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .mode-label { font-size: 11px; color: #444; margin-right: 4px; }
+
+    .mode-btn {
+      padding: 5px 14px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid #2a2a2a;
+      background: #111;
+      color: #555;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: #0a1a2a;
+      border-color: #0055aa;
+      color: #4db3ff;
+      font-weight: 600;
+    }
+
+    .mode-hint {
+      font-size: 10px;
+      color: #2a2a2a;
+      margin-left: 8px;
+    }
+
+    /* ==================== FORTSCHRITT ==================== */
+    #progress-section { display: none; }
+    #progress-section.visible { display: block; }
+
+    .progress-track {
+      height: 10px;
+      background: #111;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #006622, #00cc44);
+      border-radius: 5px;
+      transition: width 0.4s ease;
+      min-width: 0%;
+    }
+
+    .progress-fill.indeterminate {
+      width: 30% !important;
+      animation: indeterminate 1.4s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      0%   { margin-left: -30%; }
+      100% { margin-left: 100%; }
+    }
+
+    .progress-fill.done { background: linear-gradient(90deg, #006622, #00dd44); }
+    .progress-fill.error { background: #5a1a1a; }
+    .progress-fill.aborted { background: #3a3a00; }
+
+    /* Stat-Karten */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stat-card {
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .stat-card.green { border-color: #1a3a1a; background: #0a150a; }
+    .stat-card.blue  { border-color: #1a3a5c; background: #0a1520; }
+    .stat-card.gold  { border-color: #3a2a00; background: #14100a; }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ccc;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-card.green .stat-val { color: #44bb44; }
+    .stat-card.blue  .stat-val { color: #4db3ff; }
+    .stat-card.gold  .stat-val { color: #cc9900; }
+
+    .stat-lbl {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #333;
+    }
+
+    /* Aktueller Pfad */
+    .current-path-box {
+      padding: 8px 12px;
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      font-size: 10px;
+      color: #444;
+      font-family: 'Consolas', monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 10px;
+    }
+
+    /* Status-Banner */
+    .status-banner {
+      display: none;
+      padding: 10px 14px;
+      border-radius: 5px;
+      font-size: 12px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .status-banner.visible { display: flex; }
+    .status-banner.running { background: #0a1a0a; border: 1px solid #1a4a1a; color: #44aa44; }
+    .status-banner.done    { background: #0a180a; border: 1px solid #2a6a2a; color: #44cc44; }
+    .status-banner.error   { background: #150a0a; border: 1px solid #3a1515; color: #cc4444; }
+    .status-banner.aborted { background: #141400; border: 1px solid #3a3a00; color: #aaaa00; }
+
+    .banner-icon { font-size: 20px; }
+    .banner-text { flex: 1; }
+    .banner-text strong { display: block; margin-bottom: 2px; }
+    .banner-sub { font-size: 10px; opacity: 0.7; }
+
+    /* ==================== LOG ==================== */
+    #log-section { display: none; }
+    #log-section.visible { display: block; }
+
+    .log-box {
+      background: #050505;
+      border: 1px solid #161616;
+      border-radius: 5px;
+      padding: 10px 12px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: 'Consolas', monospace;
+      font-size: 10px;
+      color: #444;
+    }
+
+    .log-entry { padding: 1px 0; border-bottom: 1px solid #0d0d0d; }
+    .log-entry.info  { color: #4488aa; }
+    .log-entry.ok    { color: #44aa44; }
+    .log-entry.warn  { color: #aa8800; }
+    .log-entry.error { color: #aa3333; }
+
+    /* ==================== ERGEBNIS-AKTION ==================== */
+    .result-action {
+      display: none;
+      margin-top: 14px;
+      padding: 14px 16px;
+      background: #0a180a;
+      border: 1px solid #1a4a1a;
+      border-radius: 6px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .result-action.visible { display: flex; }
+    .result-action-text { flex: 1; font-size: 12px; color: #44aa44; }
+    .result-action-text strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .result-action-path { font-size: 10px; color: #2a6a2a; font-family: 'Consolas', monospace; }
+  </style>
+</head>
+<body>
+
+<!-- ==================== ORDNER WÄHLEN ==================== -->
+<div class="section">
+  <div class="section-label">Ordner scannen</div>
+
+  <div class="folder-row">
+    <button class="btn btn-primary" id="btn-select" onclick="selectFolder()">📂 Ordner wählen</button>
+    <div class="path-display" id="folder-display">Noch kein Ordner gewählt</div>
+  </div>
+
+  <div class="json-row">
+    <span class="json-label">Ziel-JSON:</span>
+    <input class="json-input" type="text" id="json-path-input" placeholder="Automatisch: <Ordner>\media_data.json">
+    <button class="btn btn-secondary" style="font-size:11px;padding:7px 12px;" onclick="chooseJsonTarget()">📄 Wählen</button>
+  </div>
+
+  <div class="mode-group">
+    <span class="mode-label">Modus:</span>
+    <button class="mode-btn active" id="mode-update" onclick="setMode('update')">🔄 Update</button>
+    <button class="mode-btn" id="mode-full" onclick="setMode('full')">🔁 Neu scannen</button>
+    <span class="mode-hint" id="mode-hint">Nur neue Dateien hinzufügen</span>
+  </div>
+</div>
+
+<!-- ==================== SCAN STARTEN ==================== -->
+<div class="section">
+  <div class="section-label">Scan</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <button class="btn btn-green" id="btn-scan" onclick="startScan()" disabled>▶ Scan starten</button>
+    <button class="btn btn-danger" id="btn-abort" onclick="abortScan()" disabled>✕ Abbrechen</button>
+    <span id="scan-status-text" style="font-size:11px;color:#333;">Wähle einen Ordner</span>
+  </div>
+</div>
+
+<!-- ==================== FORTSCHRITT ==================== -->
+<div class="section" id="progress-section">
+  <div class="section-label">Fortschritt</div>
+
+  <div class="progress-track">
+    <div class="progress-fill indeterminate" id="progress-fill"></div>
+  </div>
+
+  <div class="current-path-box" id="current-path">Initialisiere…</div>
+
+  <div class="stat-grid">
+    <div class="stat-card blue">
+      <div class="stat-val" id="stat-files">0</div>
+      <div class="stat-lbl">Dateien gefunden</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-folders">0</div>
+      <div class="stat-lbl">Ordner durchsucht</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-val" id="stat-new">0</div>
+      <div class="stat-lbl">Neue Dateien</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-videos">0</div>
+      <div class="stat-lbl">Videos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-images">0</div>
+      <div class="stat-lbl">Bilder</div>
+    </div>
+    <div class="stat-card gold">
+      <div class="stat-val" id="stat-existing">0</div>
+      <div class="stat-lbl">Vorhandene</div>
+    </div>
+  </div>
+
+  <div class="status-banner running" id="banner-running">
+    <div class="banner-icon">🔍</div>
+    <div class="banner-text">
+      <strong id="banner-running-title">Scanne…</strong>
+      <span class="banner-sub" id="banner-running-sub"></span>
+    </div>
+  </div>
+
+  <div class="status-banner done" id="banner-done">
+    <div class="banner-icon">✅</div>
+    <div class="banner-text">
+      <strong id="banner-done-title">Scan abgeschlossen</strong>
+      <span class="banner-sub" id="banner-done-sub"></span>
+    </div>
+  </div>
+
+  <div class="status-banner error" id="banner-error">
+    <div class="banner-icon">❌</div>
+    <div class="banner-text">
+      <strong>Fehler</strong>
+      <span class="banner-sub" id="banner-error-msg"></span>
+    </div>
+  </div>
+
+  <div class="status-banner aborted" id="banner-aborted">
+    <div class="banner-icon">⏹</div>
+    <div class="banner-text">
+      <strong>Scan abgebrochen</strong>
+      <span class="banner-sub" id="banner-aborted-sub"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ERGEBNIS + LADEN-AKTION ==================== -->
+<div class="section" id="result-section" style="display:none">
+  <div class="section-label">Ergebnis</div>
+
+  <div class="result-action" id="result-action">
+    <div class="result-action-text">
+      <strong id="result-title">Scan erfolgreich</strong>
+      <div class="result-action-path" id="result-json-path"></div>
+    </div>
+    <button class="btn btn-primary" id="btn-load-result" onclick="loadResultJson()">📂 Jetzt laden</button>
+    <button class="btn btn-secondary" onclick="openResultFolder()">📁 Im Explorer</button>
+  </div>
+</div>
+
+<!-- ==================== LOG ==================== -->
+<div class="section" id="log-section">
+  <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>Scan-Log</span>
+    <button class="btn btn-secondary" style="font-size:10px;padding:3px 10px;" onclick="clearLog()">Leeren</button>
+  </div>
+  <div class="log-box" id="log-box"></div>
+</div>
+
+<script>
+// ==================== GLOBALS ====================
+let selectedFolder = '';
+let scanMode = 'update';
+let scanRunning = false;
+let lastResult = null;
+
+const LOG_MAX = 200;
+
+// ==================== INIT ====================
+function init() {
+  console.log('[SCANNER] Init');
+
+  // scan-progress Events vom parent empfangen (IPC → top-level → postMessage)
+  if (typeof parent.window.electron?.on === 'function') {
+    parent.window.electron.on('scan-progress', handleProgress);
+  }
+
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.type === 'scan-progress') handleProgress(ev.data.data);
+  });
+}
+
+// ==================== ORDNER WÄHLEN ====================
+async function selectFolder() {
+  const folder = await parent.window.electron.invoke('select-folder');
+  if (!folder) return;
+
+  selectedFolder = folder;
+  const display = document.getElementById('folder-display');
+  display.textContent = folder;
+  display.classList.add('active');
+
+  // Standard-JSON-Pfad vorschlagen
+  const jsonInput = document.getElementById('json-path-input');
+  if (!jsonInput.value) {
+    jsonInput.placeholder = folder.replace(/\\/g, '/') + '/media_data.json';
+  }
+
+  document.getElementById('btn-scan').disabled = false;
+  document.getElementById('scan-status-text').textContent = 'Bereit zum Scannen';
+  addLog('info', `Ordner gewählt: ${folder}`);
+}
+
+// Ziel-JSON manuell wählen (Datei-Dialog zum Speichern)
+async function chooseJsonTarget() {
+  const { dialog } = parent.window.electron ? {} : {};
+  // Fallback: Nutzer trägt Pfad manuell ein — kein save-dialog IPC verfügbar
+  const input = document.getElementById('json-path-input');
+  input.focus();
+  input.select();
+  addLog('info', 'Trage den gewünschten JSON-Pfad manuell ein oder lass das Feld leer (Standard: <Ordner>/media_data.json)');
+}
+
+// ==================== MODUS WÄHLEN ====================
+function setMode(mode) {
+  scanMode = mode;
+  document.getElementById('mode-update').classList.toggle('active', mode === 'update');
+  document.getElementById('mode-full').classList.toggle('active', mode === 'full');
+  document.getElementById('mode-hint').textContent = mode === 'update'
+    ? 'Nur neue Dateien hinzufügen'
+    : 'Komplett neu scannen – vorhandene JSON wird überschrieben';
+}
+
+// ==================== SCAN STARTEN ====================
+async function startScan() {
+  if (!selectedFolder) { addLog('warn', 'Kein Ordner gewählt.'); return; }
+  if (scanRunning) return;
+
+  scanRunning = true;
+  lastResult = null;
+
+  // UI zurücksetzen
+  resetStats();
+  hideBanners();
+  showBanner('running', 'Scanne…', '');
+  showSection('progress-section');
+  showSection('log-section');
+  hideSection('result-section');
+
+  document.getElementById('btn-scan').disabled = true;
+  document.getElementById('btn-abort').disabled = false;
+  document.getElementById('scan-status-text').textContent = 'Scan läuft…';
+
+  const jsonPath = document.getElementById('json-path-input').value.trim() || null;
+
+  addLog('info', `Starte ${scanMode === 'update' ? 'Update' : 'Full'}-Scan: ${selectedFolder}`);
+  if (jsonPath) addLog('info', `Ziel-JSON: ${jsonPath}`);
+
+  try {
+    const result = await parent.window.electron.invoke('scan-media', {
+      folderPath: selectedFolder,
+      jsonPath: jsonPath || undefined,
+      mode: scanMode
+    });
+
+    if (!result.success) {
+      addLog('error', result.error || 'Unbekannter Fehler');
+    }
+  } catch (e) {
+    addLog('error', 'IPC-Fehler: ' + e.message);
+    showBanner('error', null, e.message);
+    finishScan();
+  }
+}
+
+// ==================== SCAN ABBRECHEN ====================
+async function abortScan() {
+  addLog('warn', 'Abbruch angefordert…');
+  try { await parent.window.electron.invoke('abort-scan'); } catch { }
+}
+
+// ==================== PROGRESS HANDLER ====================
+function handleProgress(data) {
+  if (!data) return;
+
+  switch (data.phase) {
+
+    case 'start':
+      document.getElementById('stat-existing').textContent = fmt(data.existingCount || 0);
+      addLog('info', `Scan gestartet · Modus: ${data.mode} · Vorhandene Einträge: ${data.existingCount || 0}`);
+      setProgressIndeterminate(true);
+      break;
+
+    case 'scanning':
+      document.getElementById('stat-files').textContent = fmt(data.scannedFiles || 0);
+      document.getElementById('stat-folders').textContent = fmt(data.scannedFolders || 0);
+      document.getElementById('stat-new').textContent = fmt(data.newFiles || 0);
+
+      if (data.currentPath) {
+        document.getElementById('current-path').textContent = '📄 ' + data.currentPath;
+      } else if (data.currentFolder) {
+        document.getElementById('current-path').textContent = '📂 ' + data.currentFolder;
+      }
+
+      document.getElementById('banner-running-sub').textContent =
+        `${fmt(data.scannedFiles)} Dateien in ${fmt(data.scannedFolders)} Ordnern`;
+      break;
+
+    case 'writing':
+      setProgressIndeterminate(false);
+      setProgressFill(90);
+      document.getElementById('current-path').textContent = '💾 Schreibe media_data.json…';
+      addLog('info', `Schreibe JSON: ${fmt(data.scannedFiles)} Dateien, ${fmt(data.newFiles)} neu`);
+      break;
+
+    case 'done':
+      lastResult = data;
+      setProgressIndeterminate(false);
+      setProgressFill(100);
+      document.getElementById('progress-fill').classList.add('done');
+
+      // Finale Statistiken
+      document.getElementById('stat-files').textContent = fmt(data.scannedFiles || 0);
+      document.getElementById('stat-folders').textContent = fmt(data.scannedFolders || 0);
+      document.getElementById('stat-new').textContent = fmt(data.newCount || 0);
+      document.getElementById('current-path').textContent = '✅ Fertig';
+
+      hideBanners();
+      showBanner('done',
+        `${fmt(data.newCount)} neue Dateien · ${fmt(data.totalCount)} gesamt`,
+        `${fmt(data.scannedFiles)} Dateien in ${fmt(data.scannedFolders)} Ordnern durchsucht`
+      );
+
+      // Ergebnis-Aktion zeigen
+      showResultAction(data);
+
+      addLog('ok', `Fertig: ${fmt(data.newCount)} neu, ${fmt(data.totalCount)} gesamt → ${data.targetJson}`);
+      finishScan();
+      break;
+
+    case 'error':
+      setProgressIndeterminate(false);
+      document.getElementById('progress-fill').classList.add('error');
+      hideBanners();
+      showBanner('error', null, data.error || 'Unbekannter Fehler');
+      addLog('error', data.error || 'Fehler');
+      finishScan();
+      break;
+
+    case 'aborted':
+      setProgressIndeterminate(false);
+      document.getElementById('progress-fill').classList.add('aborted');
+      hideBanners();
+      showBanner('aborted', null,
+        `Gestoppt bei ${fmt(data.scannedFiles)} Dateien / ${fmt(data.scannedFolders)} Ordnern`
+      );
+      addLog('warn', `Abgebrochen bei ${fmt(data.scannedFiles)} Dateien`);
+      finishScan();
+      break;
+  }
+}
+
+function finishScan() {
+  scanRunning = false;
+  document.getElementById('btn-scan').disabled = !selectedFolder;
+  document.getElementById('btn-abort').disabled = true;
+  document.getElementById('scan-status-text').textContent = lastResult ? 'Abgeschlossen' : 'Gestoppt';
+}
+
+// ==================== ERGEBNIS LADEN ====================
+function showResultAction(data) {
+  document.getElementById('result-section').style.display = 'block';
+  const action = document.getElementById('result-action');
+  action.classList.add('visible');
+  document.getElementById('result-title').textContent =
+    `${fmt(data.newCount)} neue Dateien gefunden · ${fmt(data.totalCount)} gesamt`;
+  document.getElementById('result-json-path').textContent = data.targetJson;
+}
+
+async function loadResultJson() {
+  if (!lastResult?.targetJson) return;
+  if (parent?.loadJsonFile) {
+    await parent.loadJsonFile(lastResult.targetJson);
+  }
+}
+
+async function openResultFolder() {
+  if (!lastResult?.folderPath) return;
+  await parent.window.electron.invoke('show-in-explorer', lastResult.targetJson || lastResult.folderPath);
+}
+
+// ==================== LOG ====================
+function addLog(level, msg) {
+  const box = document.getElementById('log-box');
+  const ts = new Date().toISOString().substring(11, 19);
+  const div = document.createElement('div');
+  div.className = `log-entry ${level}`;
+  div.textContent = `[${ts}] ${msg}`;
+  box.appendChild(div);
+
+  // Max Einträge begrenzen
+  while (box.children.length > LOG_MAX) box.removeChild(box.firstChild);
+
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log-box').innerHTML = '';
+}
+
+// ==================== UI HELFER ====================
+function resetStats() {
+  ['stat-files','stat-folders','stat-new','stat-videos','stat-images'].forEach(id => {
+    document.getElementById(id).textContent = '0';
+  });
+  document.getElementById('current-path').textContent = '…';
+  document.getElementById('progress-fill').className = 'progress-fill indeterminate';
+  document.getElementById('progress-fill').style.width = '';
+}
+
+function setProgressFill(pct) {
+  const fill = document.getElementById('progress-fill');
+  fill.classList.remove('indeterminate');
+  fill.style.marginLeft = '';
+  fill.style.width = pct + '%';
+}
+
+function setProgressIndeterminate(on) {
+  const fill = document.getElementById('progress-fill');
+  if (on) {
+    fill.classList.add('indeterminate');
+    fill.style.width = '';
+  } else {
+    fill.classList.remove('indeterminate');
+    fill.style.marginLeft = '';
+  }
+}
+
+function hideBanners() {
+  ['banner-running','banner-done','banner-error','banner-aborted'].forEach(id => {
+    document.getElementById(id).classList.remove('visible');
+  });
+}
+
+function showBanner(type, title, sub) {
+  const banner = document.getElementById('banner-' + type);
+  if (!banner) return;
+  if (title) {
+    const titleEl = banner.querySelector('strong');
+    if (titleEl) titleEl.textContent = title;
+  }
+  if (sub !== null) {
+    const subEl = banner.querySelector('.banner-sub');
+    if (subEl) subEl.textContent = sub || '';
+  }
+  banner.classList.add('visible');
+}
+
+function showSection(id) { document.getElementById(id).style.display = 'block'; }
+function hideSection(id) { document.getElementById(id).style.display = 'none'; }
+
+function fmt(n) { return n != null ? Number(n).toLocaleString('de-DE') : '0'; }
+
+// ==================== START ====================
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

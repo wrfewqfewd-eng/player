@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Label / Kategorien</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #080808;
+      --bg1:       #0f0f0f;
+      --bg2:       #141414;
+      --bg3:       #1a1a1a;
+      --bg4:       #222;
+      --border:    #1e1e1e;
+      --border2:   #2a2a2a;
+      --text:      #d0d0d0;
+      --text2:     #888;
+      --text3:     #555;
+      --accent:    #0077ee;
+      --accent2:   #0055bb;
+      --green:     #22c55e;
+      --orange:    #f59e0b;
+      --red:       #ef4444;
+      --purple:    #a855f7;
+      --cyan:      #06b6d4;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ======================== SPLIT LAYOUT ======================== */
+    #main-split {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ======================== LEFT PANEL (Folder Browser) ======================== */
+    #left-panel {
+      width: 420px;
+      min-width: 260px;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--bg1);
+      flex-shrink: 0;
+    }
+
+    #left-panel-header {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    .panel-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 6px;
+    }
+
+    #folder-search {
+      width: 100%;
+      padding: 5px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: inherit;
+    }
+    #folder-search:focus { outline: none; border-color: var(--accent); }
+    #folder-search::placeholder { color: var(--text3); }
+
+    #folder-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+
+    .folder-node {
+      user-select: none;
+    }
+
+    .folder-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 3px;
+      margin: 1px 4px;
+      font-size: 12px;
+      color: var(--text2);
+      transition: background 0.1s, color 0.1s;
+      position: relative;
+    }
+    .folder-row:hover { background: var(--bg3); color: var(--text); }
+    .folder-row.active { background: #0a1a2e; color: #4db3ff; border-left: 2px solid var(--accent); padding-left: 6px; }
+    .folder-row.has-selection { color: var(--orange); }
+
+    .folder-toggle {
+      font-size: 9px;
+      width: 12px;
+      flex-shrink: 0;
+      color: var(--text3);
+      text-align: center;
+    }
+
+    .folder-icon { font-size: 13px; flex-shrink: 0; }
+
+    .folder-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .folder-count {
+      font-size: 9px;
+      color: var(--text3);
+      background: var(--bg3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .folder-row.all-media {
+      color: var(--cyan);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .folder-row.all-media .folder-count { background: rgba(6,182,212,0.12); color: var(--cyan); }
+
+    .folder-children {
+      overflow: hidden;
+    }
+    .folder-children.collapsed { display: none; }
+
+    /* ======================== LEFT BOTTOM: Thumbnails ======================== */
+    #left-bottom {
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    #left-bottom-header {
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Virtual scroll wrapper */
+    #thumb-scroll {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 8px;
+      position: relative;
+    }
+
+    #thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 5px;
+    }
+
+    /* Thumb placeholder (before media loads) */
+    .thumb-item.thumb-pending {
+      background: var(--bg4);
+    }
+    .thumb-item.thumb-pending::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+      animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+
+    .thumb-item {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--bg3);
+      cursor: pointer;
+      border: 2px solid transparent;
+      position: relative;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .thumb-item:hover { transform: scale(1.04); border-color: var(--border2); }
+    .thumb-item.selected { border-color: var(--accent); }
+    .thumb-item.active-focus { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+
+    .thumb-item video,
+    .thumb-item img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .thumb-type-badge {
+      position: absolute;
+      bottom: 2px;
+      left: 2px;
+      font-size: 8px;
+      background: rgba(0,0,0,0.75);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+
+    .thumb-sel-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    /* ======================== CENTER PANEL (Labeling) ======================== */
+    #center-panel {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    #center-toolbar {
+      padding: 8px 14px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text2);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.1s;
+      white-space: nowrap;
+    }
+    .nav-btn:hover { background: var(--bg4); color: var(--text); border-color: var(--border2); }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .nav-btn.primary { background: var(--accent2); border-color: var(--accent); color: #fff; }
+    .nav-btn.primary:hover { background: var(--accent); }
+    .nav-btn kbd {
+      font-size: 9px;
+      background: rgba(255,255,255,0.08);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-family: inherit;
+    }
+
+    #item-counter {
+      font-size: 11px;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+    #item-counter strong { color: var(--accent); }
+
+    #center-toolbar .spacer { flex: 1; }
+
+    /* ======================== MEDIA STAGE ======================== */
+    #media-stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #media-stage video,
+    #media-stage img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    #stage-placeholder {
+      text-align: center;
+      color: var(--text3);
+    }
+    #stage-placeholder .ph-icon { font-size: 52px; margin-bottom: 12px; opacity: 0.3; }
+    #stage-placeholder .ph-text { font-size: 13px; }
+
+    #stage-filename {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+      max-width: 80%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    #nav-arrows {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      padding: 0 8px;
+    }
+
+    .arrow-btn {
+      pointer-events: all;
+      width: 40px; height: 40px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid var(--border2);
+      border-radius: 50%;
+      color: var(--text2);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .arrow-btn:hover { background: rgba(0,100,200,0.4); color: white; border-color: var(--accent); }
+
+    /* ======================== BOTTOM: Tag Panel ======================== */
+    #tag-panel {
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 10px 14px;
+      min-height: 0;
+    }
+
+    #tag-panel-inner {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .tag-section {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tag-section-title {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    #current-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-height: 28px;
+    }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: default;
+      transition: opacity 0.15s;
+    }
+    .tag-chip .remove-tag {
+      cursor: pointer;
+      font-size: 12px;
+      opacity: 0.6;
+      line-height: 1;
+    }
+    .tag-chip .remove-tag:hover { opacity: 1; color: var(--red); }
+
+    .tag-empty { font-size: 11px; color: var(--text3); font-style: italic; padding: 4px 0; }
+
+    .tag-input-row {
+      display: flex;
+      gap: 5px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    #tag-input-field {
+      flex: 1;
+      padding: 5px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+    }
+    #tag-input-field:focus { outline: none; border-color: var(--accent); }
+    #tag-input-field.active-input { border-color: var(--green); box-shadow: 0 0 0 1px rgba(34,197,94,0.3); }
+    #tag-input-field::placeholder { color: var(--text3); }
+
+    /* ======================== RIGHT PANEL: Label Library ======================== */
+    #right-panel {
+      width: 240px;
+      min-width: 180px;
+      border-left: 1px solid var(--border);
+      background: var(--bg1);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    #right-panel-header {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    #label-search {
+      width: 100%;
+      padding: 5px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: inherit;
+    }
+    #label-search:focus { outline: none; border-color: var(--accent); }
+    #label-search::placeholder { color: var(--text3); }
+
+    #label-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .label-category-group {
+      margin-bottom: 8px;
+    }
+
+    .label-category-header {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 8px 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .label-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.1s;
+      font-size: 12px;
+      margin: 1px 0;
+    }
+    .label-item:hover { background: var(--bg3); }
+    .label-item.active { background: rgba(0,119,238,0.15); }
+
+    .label-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .label-name { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .label-item:hover .label-name { color: var(--text); }
+    .label-item.active .label-name { color: #4db3ff; }
+    .label-usage { font-size: 9px; color: var(--text3); }
+
+    .label-hotkey {
+      font-size: 9px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      padding: 1px 4px;
+      border-radius: 2px;
+      color: var(--text3);
+      font-family: 'Consolas', monospace;
+    }
+
+    .add-label-btn {
+      margin: 6px;
+      padding: 6px;
+      background: rgba(0,119,238,0.1);
+      border: 1px dashed var(--border2);
+      border-radius: 4px;
+      color: var(--text3);
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.1s;
+      font-family: inherit;
+    }
+    .add-label-btn:hover { background: rgba(0,119,238,0.2); border-color: var(--accent); color: var(--accent); }
+
+    /* ======================== HOTKEY OVERLAY ======================== */
+    #hotkey-overlay {
+      position: fixed;
+      bottom: 20px;
+      right: 260px;
+      background: rgba(0,0,0,0.92);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 10px;
+      color: var(--text3);
+      z-index: 200;
+      display: none;
+      backdrop-filter: blur(10px);
+      min-width: 200px;
+    }
+    #hotkey-overlay.show { display: block; }
+    .hk-row { display: flex; justify-content: space-between; gap: 20px; padding: 2px 0; }
+    .hk-key { font-family: 'Consolas', monospace; color: var(--text2); background: var(--bg3); padding: 1px 5px; border-radius: 2px; border: 1px solid var(--border2); }
+    .hk-desc { color: var(--text3); }
+
+    /* ======================== TOASTS ======================== */
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      animation: toastIn 0.2s ease, toastOut 0.3s ease 1.5s forwards;
+      white-space: nowrap;
+    }
+    .toast.green { border-color: var(--green); color: var(--green); }
+    .toast.orange { border-color: var(--orange); color: var(--orange); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateY(-8px); } }
+
+    /* ======================== MODAL ======================== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 24px 28px;
+      min-width: 320px;
+      max-width: 480px;
+    }
+    .modal-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+    .modal-field { margin-bottom: 12px; }
+    .modal-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: block; }
+    .modal-input {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .modal-input:focus { outline: none; border-color: var(--accent); }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+    .modal-btn {
+      padding: 7px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      border: 1px solid var(--border2);
+      background: var(--bg3);
+      color: var(--text);
+    }
+    .modal-btn:hover { background: var(--bg4); }
+    .modal-btn.primary { background: var(--accent2); border-color: var(--accent); color: #fff; }
+    .modal-btn.primary:hover { background: var(--accent); }
+    .modal-btn.danger { background: rgba(239,68,68,0.2); border-color: var(--red); color: var(--red); }
+    .modal-btn.danger:hover { background: rgba(239,68,68,0.35); }
+
+    .color-swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .swatch {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .swatch:hover { transform: scale(1.15); }
+    .swatch.selected { border-color: white; }
+
+    /* ======================== MULTI SELECTION BANNER ======================== */
+    #selection-banner {
+      display: none;
+      background: rgba(0,85,187,0.12);
+      border-top: 1px solid rgba(0,119,238,0.3);
+      padding: 7px 14px;
+      font-size: 11px;
+      color: #4db3ff;
+      align-items: center;
+      gap: 10px;
+    }
+    #selection-banner.show { display: flex; }
+    #selection-banner .sel-count { font-weight: 700; margin-right: 4px; }
+
+    /* ======================== SCROLLBARS ======================== */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+    /* ======================== RESIZE HANDLE ======================== */
+    .resize-handle {
+      width: 4px;
+      cursor: col-resize;
+      background: var(--border);
+      transition: background 0.15s;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .resize-handle:hover, .resize-handle.dragging { background: var(--accent); }
+
+    /* ======================== EMPTY STATE ======================== */
+    .empty-state {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 11px;
+      line-height: 1.8;
+    }
+
+    /* ======================== PROGRESS BAR ======================== */
+    #label-progress-bar {
+      height: 2px;
+      background: var(--bg3);
+      position: relative;
+      flex-shrink: 0;
+    }
+    #label-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      transition: width 0.3s;
+      border-radius: 1px;
+    }
+
+    /* ======================== STATUS BAR ======================== */
+    #statusbar {
+      height: 22px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 14px;
+      font-size: 10px;
+      color: var(--text3);
+      flex-shrink: 0;
+    }
+    .sb-item strong { color: var(--text2); margin-right: 2px; }
+
+    /* ======================== HOTKEY TOAST BADGE ======================== */
+    .hotkey-hint-badge {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,119,238,0.15);
+      border: 1px solid rgba(0,119,238,0.35);
+      color: #4db3ff;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 500;
+    }
+    .hotkey-hint-badge.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ======================== MAIN SPLIT ======================== -->
+<div id="main-split">
+
+  <!-- ======================== LEFT PANEL ======================== -->
+  <div id="left-panel">
+    <div id="left-panel-header">
+      <div class="panel-title">Ordnerstruktur</div>
+      <input type="text" id="folder-search" placeholder="Ordner suchen…" oninput="filterFolders(this.value)">
+    </div>
+    <div id="folder-tree">
+      <div class="empty-state">Keine Mediendaten geladen.<br>Lade zuerst eine JSON-Datei.</div>
+    </div>
+
+    <div id="resize-h" class="resize-handle" style="height:4px; width:100%; cursor:row-resize; background:var(--border); flex-shrink:0;"></div>
+
+    <div id="left-bottom">
+      <div id="left-bottom-header">
+        <div class="panel-title" style="margin-bottom:0">Dateien im Ordner</div>
+        <div id="sel-count-badge" style="font-size:9px;color:var(--text3);">0 ausgewählt</div>
+      </div>
+      <div id="thumb-scroll">
+        <div id="thumb-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resize-v"></div>
+
+  <!-- ======================== CENTER PANEL ======================== -->
+  <div id="center-panel">
+    <div id="center-toolbar">
+      <button class="nav-btn" id="btn-prev" onclick="navigate(-1)">◀ <kbd>A / ←</kbd></button>
+      <button class="nav-btn" id="btn-next" onclick="navigate(1)">▶ <kbd>D / →</kbd></button>
+
+      <div style="width:1px;height:20px;background:var(--border);"></div>
+
+      <button class="nav-btn primary" onclick="focusTagInput()">＋ Label <kbd>E</kbd></button>
+      <button class="nav-btn" onclick="removeLastTag()">－ <kbd>Del</kbd></button>
+      <button class="nav-btn" onclick="clearAllTags()">✕ Alle <kbd>Shift+Del</kbd></button>
+
+      <div style="width:1px;height:20px;background:var(--border);"></div>
+      <button class="nav-btn" onclick="selectAllInFolder()">☑ Alle sel. <kbd>Ctrl+A</kbd></button>
+      <button class="nav-btn" onclick="applyToSelection()">→ Auf Auswahl <kbd>Ctrl+Enter</kbd></button>
+
+      <div class="spacer"></div>
+      <span id="item-counter">–</span>
+      <button class="nav-btn" onclick="toggleHotkeyOverlay()">⌨ Hotkeys <kbd>?</kbd></button>
+    </div>
+
+    <div id="label-progress-bar">
+      <div id="label-progress-fill" style="width:0%"></div>
+    </div>
+
+    <div id="media-stage">
+      <div id="stage-placeholder">
+        <div class="ph-icon">🏷️</div>
+        <div class="ph-text">Wähle einen Ordner und eine Datei aus</div>
+      </div>
+      <div id="stage-filename" style="display:none"></div>
+      <div id="nav-arrows" style="display:none">
+        <button class="arrow-btn" onclick="navigate(-1)">‹</button>
+        <button class="arrow-btn" onclick="navigate(1)">›</button>
+      </div>
+    </div>
+
+    <!-- Selection Banner -->
+    <div id="selection-banner">
+      <span><span class="sel-count" id="sel-count-text">0</span> Dateien ausgewählt</span>
+      <button class="nav-btn" onclick="applyToSelection()">Tags auf Auswahl anwenden <kbd>Ctrl+Enter</kbd></button>
+      <button class="nav-btn" onclick="clearSelection()">Auswahl aufheben <kbd>Esc</kbd></button>
+    </div>
+
+    <!-- Tag Panel -->
+    <div id="tag-panel">
+      <div id="tag-panel-inner">
+        <div class="tag-section">
+          <div class="tag-section-title">Labels dieser Datei</div>
+          <div id="current-tags">
+            <span class="tag-empty">Keine Labels</span>
+          </div>
+          <div class="tag-input-row">
+            <input type="text" id="tag-input-field" placeholder='Label eingeben… (Enter = hinzufügen)' 
+                   oninput="onTagInputChange(this.value)" 
+                   onkeydown="onTagInputKey(event)">
+            <button class="nav-btn" onclick="commitTagInput()">＋</button>
+          </div>
+        </div>
+        <div class="tag-section" style="max-width:200px">
+          <div class="tag-section-title">Schnellzugriff (1–9)</div>
+          <div id="quick-labels" style="display:flex;flex-wrap:wrap;gap:4px;">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="statusbar">
+      <div class="sb-item"><strong>Ordner:</strong><span id="sb-folder">—</span></div>
+      <div class="sb-item"><strong>Datei:</strong><span id="sb-file">—</span></div>
+      <div class="sb-item"><strong>Labels:</strong><span id="sb-tags">0</span></div>
+      <div class="sb-item"><strong>Fortschritt:</strong><span id="sb-progress">—</span></div>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resize-v2"></div>
+
+  <!-- ======================== RIGHT PANEL ======================== -->
+  <div id="right-panel">
+    <div id="right-panel-header">
+      <div class="panel-title">Label-Bibliothek</div>
+      <input type="text" id="label-search" placeholder="Label suchen…" oninput="filterLabels(this.value)">
+    </div>
+    <div id="label-list"></div>
+    <button class="add-label-btn" onclick="openAddLabelModal()">＋ Neues Label erstellen</button>
+  </div>
+</div>
+
+<!-- ======================== HOTKEY OVERLAY ======================== -->
+<div id="hotkey-overlay">
+  <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:8px;letter-spacing:1px;">HOTKEYS</div>
+  <div class="hk-row"><span class="hk-key">E</span><span class="hk-desc">Label-Eingabe fokussieren</span></div>
+  <div class="hk-row"><span class="hk-key">←/A</span><span class="hk-desc">Vorherige Datei</span></div>
+  <div class="hk-row"><span class="hk-key">→/D</span><span class="hk-desc">Nächste Datei</span></div>
+  <div class="hk-row"><span class="hk-key">1–9</span><span class="hk-desc">Quick-Label anwenden</span></div>
+  <div class="hk-row"><span class="hk-key">Del</span><span class="hk-desc">Letztes Label entfernen</span></div>
+  <div class="hk-row"><span class="hk-key">Shift+Del</span><span class="hk-desc">Alle Labels löschen</span></div>
+  <div class="hk-row"><span class="hk-key">Ctrl+A</span><span class="hk-desc">Alle Dateien wählen</span></div>
+  <div class="hk-row"><span class="hk-key">Ctrl+↵</span><span class="hk-desc">Labels auf Auswahl</span></div>
+  <div class="hk-row"><span class="hk-key">Esc</span><span class="hk-desc">Auswahl aufheben</span></div>
+  <div class="hk-row"><span class="hk-key">?</span><span class="hk-desc">Dieses Fenster</span></div>
+</div>
+
+<!-- ======================== TOAST CONTAINER ======================== -->
+<div id="toast-container"></div>
+
+<!-- Hotkey hint badge -->
+<div class="hotkey-hint-badge" id="hk-hint-badge"></div>
+
+<!-- ======================== ADD LABEL MODAL ======================== -->
+<div class="modal-overlay" id="modal-add-label">
+  <div class="modal">
+    <div class="modal-title">🏷️ Neues Label erstellen</div>
+    <div class="modal-field">
+      <label class="modal-label">Name</label>
+      <input class="modal-input" id="ml-name" type="text" placeholder="z.B. Favoriten">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Kategorie (optional)</label>
+      <input class="modal-input" id="ml-category" type="text" placeholder="z.B. Bewertung">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Farbe</label>
+      <div class="color-swatches" id="swatch-container"></div>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Quick-Hotkey (optional, 1–9)</label>
+      <input class="modal-input" id="ml-hotkey" type="text" maxlength="1" placeholder="1">
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="closeModal('modal-add-label')">Abbrechen</button>
+      <button class="modal-btn primary" onclick="confirmAddLabel()">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT LABEL MODAL -->
+<div class="modal-overlay" id="modal-edit-label">
+  <div class="modal">
+    <div class="modal-title">✏️ Label bearbeiten</div>
+    <div class="modal-field">
+      <label class="modal-label">Name</label>
+      <input class="modal-input" id="el-name" type="text">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Kategorie</label>
+      <input class="modal-input" id="el-category" type="text">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Farbe</label>
+      <div class="color-swatches" id="el-swatch-container"></div>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Quick-Hotkey (1–9)</label>
+      <input class="modal-input" id="el-hotkey" type="text" maxlength="1">
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn danger" onclick="deleteCurrentLabel()">Löschen</button>
+      <button class="modal-btn" onclick="closeModal('modal-edit-label')">Abbrechen</button>
+      <button class="modal-btn primary" onclick="confirmEditLabel()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+let state = null;
+let allItems = [];
+let currentFolderItems = [];
+let currentIndex = 0;
+let currentFolderPath = '';
+let selectedPaths = new Set();
+let hotkeyOverlayOpen = false;
+let editingLabelId = null;
+let selectedSwatchColor = '#0077ee';
+let editSelectedSwatchColor = '#0077ee';
+let tagInputActive = false;
+
+// Label library persisted in localStorage
+let labelLibrary = loadLabelLibrary();
+
+const SWATCH_COLORS = [
+  '#0077ee','#22c55e','#f59e0b','#ef4444','#a855f7',
+  '#06b6d4','#f97316','#ec4899','#84cc16','#6366f1',
+  '#14b8a6','#e879f9','#fb923c','#4ade80','#818cf8'
+];
+
+// ================================================================
+// INIT
+// ================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  initSwatches('swatch-container', (c) => { selectedSwatchColor = c; });
+  initSwatches('el-swatch-container', (c) => { editSelectedSwatchColor = c; });
+
+  // Try to get AppState from parent
+  try {
+    state = window.parent.AppState ? window.parent.AppState.getInstance() : null;
+    if (state) {
+      allItems = state.getMediaItems();
+      state.on('items-changed', (items) => {
+        allItems = items || [];
+        buildFolderTree();
+      });
+      state.on('items-chunk-added', () => {
+        allItems = state.getMediaItems();
+        buildFolderTree();
+      });
+    }
+  } catch(e) {}
+
+  buildFolderTree();
+  renderLabelList();
+  renderQuickLabels();
+  initResizeHandles();
+  initKeyboard();
+});
+
+// ================================================================
+// LABEL LIBRARY
+// ================================================================
+function loadLabelLibrary() {
+  try {
+    const raw = localStorage.getItem('mm_label_library');
+    return raw ? JSON.parse(raw) : getDefaultLabels();
+  } catch { return getDefaultLabels(); }
+}
+
+function saveLabelLibrary() {
+  try { localStorage.setItem('mm_label_library', JSON.stringify(labelLibrary)); } catch {}
+}
+
+function getDefaultLabels() {
+  return [
+    { id: 'l1', name: 'Favoriten', category: 'Bewertung', color: '#f59e0b', hotkey: '1' },
+    { id: 'l2', name: 'Gut', category: 'Bewertung', color: '#22c55e', hotkey: '2' },
+    { id: 'l3', name: 'Löschen', category: 'Aktion', color: '#ef4444', hotkey: '3' },
+    { id: 'l4', name: 'Prüfen', category: 'Aktion', color: '#a855f7', hotkey: '4' },
+    { id: 'l5', name: 'Bearbeiten', category: 'Aktion', color: '#0077ee', hotkey: '5' },
+    { id: 'l6', name: 'Archiv', category: 'Status', color: '#6366f1', hotkey: '6' },
+    { id: 'l7', name: 'Export', category: 'Status', color: '#06b6d4', hotkey: '7' },
+  ];
+}
+
+// ================================================================
+// FOLDER TREE
+// ================================================================
+function getFolderStructure(items) {
+  const tree = {};
+  for (const item of items) {
+    const fp = item.folderPath || item.folder || '';
+    if (!fp) { 
+      if (!tree['']) tree[''] = { path: '', items: [], children: {} };
+      tree[''].items.push(item);
+      continue;
+    }
+    const parts = fp.split('/');
+    let cur = tree;
+    let pathSoFar = '';
+    for (const part of parts) {
+      pathSoFar = pathSoFar ? `${pathSoFar}/${part}` : part;
+      if (!cur[part]) cur[part] = { path: pathSoFar, name: part, items: [], children: {}, _count: 0 };
+      cur[part]._count++;
+      cur = cur[part].children;
+    }
+    // put item in its leaf
+    let leaf = tree;
+    const leafParts = fp.split('/');
+    for (let i = 0; i < leafParts.length - 1; i++) leaf = leaf[leafParts[i]].children;
+    leaf[leafParts[leafParts.length-1]].items.push(item);
+  }
+  return tree;
+}
+
+function countItemsInNode(node) {
+  let count = node.items ? node.items.length : 0;
+  for (const child of Object.values(node.children || {})) count += countItemsInNode(child);
+  return count;
+}
+
+function buildFolderTree() {
+  const tree = getFolderStructure(allItems);
+  const container = document.getElementById('folder-tree');
+  
+  if (allItems.length === 0) {
+    container.innerHTML = '<div class="empty-state">Keine Mediendaten geladen.<br>Lade zuerst eine JSON-Datei.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+
+  // ── "Alle Medien" Eintrag ──────────────────────────────────────
+  const allRow = document.createElement('div');
+  allRow.className = 'folder-row all-media';
+  allRow.dataset.path = '__ALL__';
+  allRow.innerHTML = `
+    <span class="folder-toggle"></span>
+    <span class="folder-icon">🗂️</span>
+    <span class="folder-label">Alle Medien</span>
+    <span class="folder-count">${allItems.length}</span>`;
+  allRow.addEventListener('click', () => selectFolder('__ALL__'));
+  container.appendChild(allRow);
+
+  // ── Root items (no folder) ────────────────────────────────────
+  const rootItems = allItems.filter(i => !(i.folderPath || i.folder || ''));
+  if (rootItems.length > 0) {
+    const row = makeFolderRow('', '📂 Root', rootItems.length, 0);
+    container.appendChild(row);
+  }
+
+  function renderNodeInto(nodeMap, depth, target) {
+    const keys = Object.keys(nodeMap).sort();
+    for (const key of keys) {
+      const node = nodeMap[key];
+      const total = countItemsInNode(node);
+      const hasChildren = Object.keys(node.children || {}).length > 0;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'folder-node';
+      const row = makeFolderRow(node.path, key, total, depth, hasChildren);
+      wrapper.appendChild(row);
+      if (hasChildren) {
+        const childContainer = document.createElement('div');
+        childContainer.className = 'folder-children';
+        childContainer.dataset.parent = node.path;
+        renderNodeInto(node.children, depth + 1, childContainer);
+        wrapper.appendChild(childContainer);
+      }
+      target.appendChild(wrapper);
+    }
+  }
+
+  renderNodeInto(tree, 0, container);
+}
+
+function makeFolderRow(path, name, count, depth, hasChildren = false) {
+  const row = document.createElement('div');
+  row.className = 'folder-row';
+  row.dataset.path = path;
+  row.style.paddingLeft = `${8 + depth * 14}px`;
+
+  const toggle = document.createElement('span');
+  toggle.className = 'folder-toggle';
+  toggle.textContent = hasChildren ? '▶' : '';
+  if (hasChildren) {
+    toggle.style.cursor = 'pointer';
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const node = row.parentElement;
+      const children = node.querySelector('.folder-children');
+      if (children) {
+        children.classList.toggle('collapsed');
+        toggle.textContent = children.classList.contains('collapsed') ? '▶' : '▼';
+      }
+    });
+  }
+  row.appendChild(toggle);
+
+  const icon = document.createElement('span');
+  icon.className = 'folder-icon';
+  icon.textContent = '📁';
+  row.appendChild(icon);
+
+  const label = document.createElement('span');
+  label.className = 'folder-label';
+  label.textContent = name || '(Root)';
+  row.appendChild(label);
+
+  const badge = document.createElement('span');
+  badge.className = 'folder-count';
+  badge.textContent = count;
+  row.appendChild(badge);
+
+  row.addEventListener('click', () => selectFolder(path));
+  return row;
+}
+
+function selectFolder(path) {
+  currentFolderPath = path;
+  selectedPaths.clear();
+
+  // Highlight
+  document.querySelectorAll('.folder-row').forEach(r => r.classList.remove('active'));
+  document.querySelectorAll(`.folder-row[data-path="${CSS.escape(path)}"]`).forEach(r => r.classList.add('active'));
+
+  // Filter items
+  if (path === '__ALL__') {
+    currentFolderItems = [...allItems];
+  } else if (path === '') {
+    currentFolderItems = allItems.filter(i => !(i.folderPath || i.folder || ''));
+  } else {
+    currentFolderItems = allItems.filter(i => {
+      const fp = i.folderPath || i.folder || '';
+      return fp === path || fp.startsWith(path + '/');
+    });
+  }
+
+  currentIndex = 0;
+  renderThumbs();
+  loadCurrentItem();
+  updateSelectionUI();
+  document.getElementById('sb-folder').textContent =
+    path === '__ALL__' ? 'Alle Medien' : (path || 'Root');
+}
+
+function filterFolders(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.folder-row').forEach(row => {
+    const name = (row.dataset.path || '').toLowerCase();
+    row.parentElement.style.display = !q || name.includes(q) ? '' : 'none';
+  });
+}
+
+// ================================================================
+// THUMBNAILS – memory-safe lazy loading via IntersectionObserver
+// ================================================================
+let _thumbObserver = null;
+
+function _disconnectThumbObserver() {
+  if (_thumbObserver) { _thumbObserver.disconnect(); _thumbObserver = null; }
+}
+
+function _loadThumbMedia(el, item) {
+  if (el.dataset.loaded === '1') return;
+  el.dataset.loaded = '1';
+  el.classList.remove('thumb-pending');
+
+  if (item.type === 'video') {
+    const vid = document.createElement('video');
+    vid.src = `file:///${item.path.replace(/\\/g, '/')}`;
+    vid.preload = 'metadata';
+    vid.muted = true;
+    vid.addEventListener('loadedmetadata', () => { try { vid.currentTime = 1; } catch {} });
+    // insert before badge
+    const badge = el.querySelector('.thumb-type-badge');
+    el.insertBefore(vid, badge);
+  } else if (item.type === 'image') {
+    const img = document.createElement('img');
+    img.src = `file:///${item.path.replace(/\\/g, '/')}`;
+    const badge = el.querySelector('.thumb-type-badge');
+    el.insertBefore(img, badge);
+  }
+  // plain files: nothing extra needed, badge already shown
+}
+
+function renderThumbs() {
+  _disconnectThumbObserver();
+  const grid = document.getElementById('thumb-grid');
+  const scrollEl = document.getElementById('thumb-scroll');
+  grid.innerHTML = '';
+
+  currentFolderItems.forEach((item, idx) => {
+    const el = document.createElement('div');
+    el.className = 'thumb-item thumb-pending';
+    el.dataset.path = item.path;
+    el.dataset.idx = idx;
+    el.dataset.loaded = '0';
+    if (idx === currentIndex) el.classList.add('active-focus');
+    if (selectedPaths.has(item.path)) el.classList.add('selected');
+
+    // Lightweight type badge always visible
+    const badge = document.createElement('div');
+    badge.className = 'thumb-type-badge';
+    badge.textContent = item.type === 'video' ? '▶' : (item.type === 'image' ? '🖼' : '📄');
+    el.appendChild(badge);
+
+    // Click handler (single, handles ctrl+shift+plain)
+    el.addEventListener('click', (e) => {
+      if (e.shiftKey && selectedPaths.size > 0) {
+        const lastSelected = [...selectedPaths];
+        const lastIdx = currentFolderItems.findIndex(i => i.path === lastSelected[lastSelected.length - 1]);
+        const lo = Math.min(lastIdx, idx);
+        const hi = Math.max(lastIdx, idx);
+        for (let i = lo; i <= hi; i++) selectedPaths.add(currentFolderItems[i].path);
+        renderThumbFocus();
+        updateSelectionUI();
+      } else if (e.ctrlKey) {
+        toggleSelectItem(item.path, idx);
+      } else {
+        currentIndex = idx;
+        loadCurrentItem();
+        renderThumbFocus();
+      }
+    });
+
+    grid.appendChild(el);
+  });
+
+  // IntersectionObserver: only decode media when thumb enters viewport
+  _thumbObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const idx = parseInt(el.dataset.idx);
+      const item = currentFolderItems[idx];
+      if (item) _loadThumbMedia(el, item);
+      _thumbObserver.unobserve(el);
+    });
+  }, { root: scrollEl, rootMargin: '80px', threshold: 0 });
+
+  grid.querySelectorAll('.thumb-item').forEach(el => _thumbObserver.observe(el));
+
+  updateSelBadge();
+}
+
+function renderThumbFocus() {
+  document.querySelectorAll('.thumb-item').forEach((el, idx) => {
+    el.classList.toggle('active-focus', parseInt(el.dataset.idx) === currentIndex);
+    el.classList.toggle('selected', selectedPaths.has(el.dataset.path));
+    // selection number badge
+    const existing = el.querySelector('.thumb-sel-badge');
+    if (existing) existing.remove();
+    if (selectedPaths.has(el.dataset.path)) {
+      const badge = document.createElement('div');
+      badge.className = 'thumb-sel-badge';
+      badge.textContent = '✓';
+      el.appendChild(badge);
+    }
+  });
+  updateSelBadge();
+}
+
+function updateSelBadge() {
+  document.getElementById('sel-count-badge').textContent = `${selectedPaths.size} ausgewählt`;
+}
+
+function toggleSelectItem(path, idx) {
+  if (selectedPaths.has(path)) selectedPaths.delete(path);
+  else selectedPaths.add(path);
+  renderThumbFocus();
+  updateSelectionUI();
+}
+
+// ================================================================
+// MEDIA STAGE
+// ================================================================
+function loadCurrentItem() {
+  const stage = document.getElementById('media-stage');
+  const item = currentFolderItems[currentIndex];
+  const placeholder = document.getElementById('stage-placeholder');
+  const filenameEl = document.getElementById('stage-filename');
+  const arrows = document.getElementById('nav-arrows');
+
+  // Remove old media
+  stage.querySelectorAll('video, img').forEach(e => e.remove());
+
+  if (!item) {
+    placeholder.style.display = '';
+    filenameEl.style.display = 'none';
+    arrows.style.display = 'none';
+    updateCounter();
+    return;
+  }
+
+  placeholder.style.display = 'none';
+  filenameEl.style.display = 'block';
+  filenameEl.textContent = item.fileName || item.name;
+  arrows.style.display = currentFolderItems.length > 1 ? '' : 'none';
+
+  const fileSrc = `file:///${(item.path || '').replace(/\\/g, '/')}`;
+
+  if (item.type === 'video') {
+    const vid = document.createElement('video');
+    vid.src = fileSrc;
+    vid.controls = true;
+    vid.autoplay = false;
+    vid.style.maxWidth = '100%';
+    vid.style.maxHeight = '100%';
+    vid.style.objectFit = 'contain';
+    stage.insertBefore(vid, filenameEl);
+  } else if (item.type === 'image') {
+    const img = document.createElement('img');
+    img.src = fileSrc;
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '100%';
+    img.style.objectFit = 'contain';
+    stage.insertBefore(img, filenameEl);
+  } else {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;flex-direction:column;align-items:center;color:#666;gap:8px;';
+    div.innerHTML = `<div style="font-size:52px;">📄</div><div style="font-size:13px;">${item.fileName||''}</div>`;
+    stage.insertBefore(div, filenameEl);
+  }
+
+  renderCurrentTags();
+  updateCounter();
+  updateProgress();
+  document.getElementById('sb-file').textContent = item.fileName || item.name || '—';
+}
+
+function navigate(dir) {
+  if (currentFolderItems.length === 0) return;
+  currentIndex = (currentIndex + dir + currentFolderItems.length) % currentFolderItems.length;
+  loadCurrentItem();
+  renderThumbFocus();
+  // scroll thumb into view
+  const thumb = document.querySelector(`.thumb-item[data-idx="${currentIndex}"]`);
+  if (thumb) thumb.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// ================================================================
+// TAGS / LABELS
+// ================================================================
+function getCurrentItem() {
+  return currentFolderItems[currentIndex] || null;
+}
+
+function renderCurrentTags() {
+  const item = getCurrentItem();
+  const container = document.getElementById('current-tags');
+  container.innerHTML = '';
+
+  const tags = item ? (item.tags || []) : [];
+  if (tags.length === 0) {
+    container.innerHTML = '<span class="tag-empty">Keine Labels</span>';
+  } else {
+    tags.forEach((tag, idx) => {
+      const labelDef = labelLibrary.find(l => l.name === tag);
+      const color = labelDef ? labelDef.color : '#888';
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.style.background = hexToRgba(color, 0.18);
+      chip.style.border = `1px solid ${hexToRgba(color, 0.5)}`;
+      chip.style.color = color;
+      chip.innerHTML = `${tag} <span class="remove-tag" onclick="removeTag('${tag.replace(/'/g, "\\'")}')">✕</span>`;
+      container.appendChild(chip);
+    });
+  }
+
+  document.getElementById('sb-tags').textContent = tags.length;
+}
+
+function addTag(tagName) {
+  const item = getCurrentItem();
+  if (!item) return;
+  tagName = tagName.trim();
+  if (!tagName) return;
+  if (!item.tags) item.tags = [];
+  if (!item.tags.includes(tagName)) {
+    item.tags.push(tagName);
+    showHotkeyHint(`+${tagName}`);
+    toast(`Label "${tagName}" hinzugefügt`, 'green');
+  }
+  renderCurrentTags();
+  updateThumbTagIndicator();
+}
+
+function removeTag(tagName) {
+  const item = getCurrentItem();
+  if (!item || !item.tags) return;
+  item.tags = item.tags.filter(t => t !== tagName);
+  renderCurrentTags();
+  updateThumbTagIndicator();
+  toast(`Label "${tagName}" entfernt`, 'orange');
+}
+
+function removeLastTag() {
+  const item = getCurrentItem();
+  if (!item || !item.tags || item.tags.length === 0) return;
+  const last = item.tags.pop();
+  renderCurrentTags();
+  updateThumbTagIndicator();
+  toast(`Label "${last}" entfernt`);
+}
+
+function clearAllTags() {
+  const item = getCurrentItem();
+  if (!item) return;
+  item.tags = [];
+  renderCurrentTags();
+  updateThumbTagIndicator();
+  toast('Alle Labels entfernt');
+}
+
+function updateThumbTagIndicator() {
+  // Could add small tag count overlay on thumb, skip for simplicity
+}
+
+function applyToSelection() {
+  const item = getCurrentItem();
+  if (!item) return;
+  const tags = [...(item.tags || [])];
+  if (tags.length === 0) { toast('Keine Labels zum Anwenden', 'orange'); return; }
+
+  let count = 0;
+  for (const path of selectedPaths) {
+    const target = allItems.find(i => i.path === path);
+    if (target && target.path !== item.path) {
+      if (!target.tags) target.tags = [];
+      for (const t of tags) {
+        if (!target.tags.includes(t)) { target.tags.push(t); count++; }
+      }
+    }
+  }
+  toast(`Labels auf ${selectedPaths.size} Dateien angewendet (${count} neu)`, 'green');
+}
+
+// ================================================================
+// TAG INPUT
+// ================================================================
+function focusTagInput() {
+  const input = document.getElementById('tag-input-field');
+  input.classList.add('active-input');
+  input.focus();
+  tagInputActive = true;
+}
+
+function onTagInputChange(val) {}
+
+function onTagInputKey(e) {
+  if (e.key === 'Enter') {
+    commitTagInput();
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    blurTagInput();
+  }
+}
+
+function commitTagInput() {
+  const input = document.getElementById('tag-input-field');
+  const val = input.value.trim();
+  if (val) {
+    addTag(val);
+    input.value = '';
+  }
+  blurTagInput();
+}
+
+function blurTagInput() {
+  const input = document.getElementById('tag-input-field');
+  input.classList.remove('active-input');
+  input.blur();
+  tagInputActive = false;
+}
+
+// ================================================================
+// QUICK LABELS (1–9)
+// ================================================================
+function renderQuickLabels() {
+  const container = document.getElementById('quick-labels');
+  container.innerHTML = '';
+  const hotkeyLabels = labelLibrary.filter(l => l.hotkey && /^[1-9]$/.test(l.hotkey)).sort((a,b) => a.hotkey.localeCompare(b.hotkey));
+  
+  hotkeyLabels.forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-btn';
+    btn.style.background = hexToRgba(label.color, 0.15);
+    btn.style.borderColor = hexToRgba(label.color, 0.5);
+    btn.style.color = label.color;
+    btn.style.fontSize = '11px';
+    btn.style.padding = '3px 8px';
+    btn.innerHTML = `<kbd style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:2px;font-size:9px;">${label.hotkey}</kbd> ${label.name}`;
+    btn.onclick = () => addTag(label.name);
+    container.appendChild(btn);
+  });
+}
+
+// ================================================================
+// LABEL LIBRARY UI
+// ================================================================
+function renderLabelList(filter = '') {
+  const container = document.getElementById('label-list');
+  container.innerHTML = '';
+
+  const groups = {};
+  for (const label of labelLibrary) {
+    const cat = label.category || 'Allgemein';
+    if (filter && !label.name.toLowerCase().includes(filter.toLowerCase())) continue;
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(label);
+  }
+
+  if (Object.keys(groups).length === 0) {
+    container.innerHTML = '<div class="empty-state">Keine Labels gefunden</div>';
+    return;
+  }
+
+  for (const [cat, labels] of Object.entries(groups)) {
+    const group = document.createElement('div');
+    group.className = 'label-category-group';
+    
+    const header = document.createElement('div');
+    header.className = 'label-category-header';
+    header.innerHTML = `<span>${cat}</span><span style="font-size:9px;color:var(--text3);">${labels.length}</span>`;
+    group.appendChild(header);
+
+    for (const label of labels) {
+      const item = document.createElement('div');
+      item.className = 'label-item';
+
+      const dot = document.createElement('div');
+      dot.className = 'label-dot';
+      dot.style.background = label.color;
+      item.appendChild(dot);
+
+      const name = document.createElement('span');
+      name.className = 'label-name';
+      name.textContent = label.name;
+      item.appendChild(name);
+
+      if (label.hotkey) {
+        const hk = document.createElement('span');
+        hk.className = 'label-hotkey';
+        hk.textContent = label.hotkey;
+        item.appendChild(hk);
+      }
+
+      // click = apply tag, double-click = edit
+      item.addEventListener('click', () => addTag(label.name));
+      item.addEventListener('dblclick', (e) => { e.stopPropagation(); openEditLabelModal(label.id); });
+      group.appendChild(item);
+    }
+
+    container.appendChild(group);
+  }
+}
+
+function filterLabels(val) {
+  renderLabelList(val);
+}
+
+// ================================================================
+// LABEL MODALS
+// ================================================================
+function initSwatches(containerId, onSelect) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  c.innerHTML = '';
+  SWATCH_COLORS.forEach(color => {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = color;
+    sw.dataset.color = color;
+    sw.addEventListener('click', () => {
+      c.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+      onSelect(color);
+    });
+    c.appendChild(sw);
+  });
+  // Select first
+  const first = c.querySelector('.swatch');
+  if (first) { first.classList.add('selected'); onSelect(SWATCH_COLORS[0]); }
+}
+
+function setSwatchSelected(containerId, color) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  c.querySelectorAll('.swatch').forEach(sw => {
+    sw.classList.toggle('selected', sw.dataset.color === color);
+  });
+}
+
+function openAddLabelModal() {
+  document.getElementById('ml-name').value = '';
+  document.getElementById('ml-category').value = '';
+  document.getElementById('ml-hotkey').value = '';
+  selectedSwatchColor = SWATCH_COLORS[0];
+  setSwatchSelected('swatch-container', SWATCH_COLORS[0]);
+  document.getElementById('modal-add-label').classList.add('show');
+  setTimeout(() => document.getElementById('ml-name').focus(), 50);
+}
+
+function confirmAddLabel() {
+  const name = document.getElementById('ml-name').value.trim();
+  if (!name) { toast('Name erforderlich', 'orange'); return; }
+  const category = document.getElementById('ml-category').value.trim();
+  const hotkey = document.getElementById('ml-hotkey').value.trim();
+  const id = 'l' + Date.now();
+  labelLibrary.push({ id, name, category: category || 'Allgemein', color: selectedSwatchColor, hotkey });
+  saveLabelLibrary();
+  closeModal('modal-add-label');
+  renderLabelList();
+  renderQuickLabels();
+  toast(`Label "${name}" erstellt`, 'green');
+}
+
+function openEditLabelModal(labelId) {
+  const label = labelLibrary.find(l => l.id === labelId);
+  if (!label) return;
+  editingLabelId = labelId;
+  document.getElementById('el-name').value = label.name;
+  document.getElementById('el-category').value = label.category || '';
+  document.getElementById('el-hotkey').value = label.hotkey || '';
+  editSelectedSwatchColor = label.color;
+  setSwatchSelected('el-swatch-container', label.color);
+  document.getElementById('modal-edit-label').classList.add('show');
+  setTimeout(() => document.getElementById('el-name').focus(), 50);
+}
+
+function confirmEditLabel() {
+  const label = labelLibrary.find(l => l.id === editingLabelId);
+  if (!label) return;
+  label.name = document.getElementById('el-name').value.trim() || label.name;
+  label.category = document.getElementById('el-category').value.trim() || 'Allgemein';
+  label.hotkey = document.getElementById('el-hotkey').value.trim();
+  label.color = editSelectedSwatchColor;
+  saveLabelLibrary();
+  closeModal('modal-edit-label');
+  renderLabelList();
+  renderQuickLabels();
+  toast('Label aktualisiert', 'green');
+}
+
+function deleteCurrentLabel() {
+  const label = labelLibrary.find(l => l.id === editingLabelId);
+  if (!label) return;
+  labelLibrary = labelLibrary.filter(l => l.id !== editingLabelId);
+  saveLabelLibrary();
+  closeModal('modal-edit-label');
+  renderLabelList();
+  renderQuickLabels();
+  toast(`Label "${label.name}" gelöscht`, 'orange');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ================================================================
+// SELECTION
+// ================================================================
+function selectAllInFolder() {
+  currentFolderItems.forEach(i => selectedPaths.add(i.path));
+  renderThumbFocus();
+  updateSelectionUI();
+  toast(`${selectedPaths.size} Dateien ausgewählt`);
+}
+
+function clearSelection() {
+  selectedPaths.clear();
+  renderThumbFocus();
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const banner = document.getElementById('selection-banner');
+  banner.classList.toggle('show', selectedPaths.size > 0);
+  document.getElementById('sel-count-text').textContent = selectedPaths.size;
+}
+
+// ================================================================
+// KEYBOARD
+// ================================================================
+function initKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    // If modal open, don't intercept
+    if (document.querySelector('.modal-overlay.show')) return;
+
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
+    if (e.key === '?' && !isInput) { toggleHotkeyOverlay(); return; }
+    if (e.key === 'Escape') {
+      if (tagInputActive) { blurTagInput(); return; }
+      if (selectedPaths.size > 0) { clearSelection(); return; }
+      if (hotkeyOverlayOpen) { toggleHotkeyOverlay(); return; }
+      return;
+    }
+
+    if (isInput) return; // don't override text input
+
+    if (e.key === 'e' || e.key === 'E') { focusTagInput(); e.preventDefault(); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { navigate(-1); e.preventDefault(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { navigate(1); e.preventDefault(); return; }
+    if (e.key === 'Delete') {
+      if (e.shiftKey) clearAllTags();
+      else removeLastTag();
+      return;
+    }
+    if (e.ctrlKey && e.key === 'a') { selectAllInFolder(); e.preventDefault(); return; }
+    if (e.ctrlKey && e.key === 'Enter') { applyToSelection(); e.preventDefault(); return; }
+
+    // Quick hotkeys 1–9
+    if (/^[1-9]$/.test(e.key)) {
+      const label = labelLibrary.find(l => l.hotkey === e.key);
+      if (label) { addTag(label.name); showHotkeyHint(`${e.key} → ${label.name}`); }
+      return;
+    }
+  });
+}
+
+// ================================================================
+// UI HELPERS
+// ================================================================
+function updateCounter() {
+  const el = document.getElementById('item-counter');
+  if (currentFolderItems.length === 0) { el.innerHTML = '–'; return; }
+  el.innerHTML = `<strong>${currentIndex + 1}</strong> / ${currentFolderItems.length}`;
+}
+
+function updateProgress() {
+  const pct = currentFolderItems.length > 0 ? ((currentIndex + 1) / currentFolderItems.length * 100) : 0;
+  document.getElementById('label-progress-fill').style.width = pct + '%';
+  document.getElementById('sb-progress').textContent = 
+    currentFolderItems.length > 0 ? `${currentIndex + 1}/${currentFolderItems.length} (${Math.round(pct)}%)` : '—';
+}
+
+function toggleHotkeyOverlay() {
+  hotkeyOverlayOpen = !hotkeyOverlayOpen;
+  document.getElementById('hotkey-overlay').classList.toggle('show', hotkeyOverlayOpen);
+}
+
+function toast(msg, type = '') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast${type ? ' ' + type : ''}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+function showHotkeyHint(text) {
+  const el = document.getElementById('hk-hint-badge');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1200);
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ================================================================
+// RESIZE HANDLES
+// ================================================================
+function initResizeHandles() {
+  // Vertical: left panel width
+  const vHandle = document.getElementById('resize-v');
+  let vDragging = false, vStartX = 0, vStartW = 0;
+  vHandle.addEventListener('mousedown', (e) => {
+    vDragging = true; vStartX = e.clientX;
+    vStartW = document.getElementById('left-panel').offsetWidth;
+    vHandle.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!vDragging) return;
+    const w = Math.max(180, Math.min(520, vStartW + e.clientX - vStartX));
+    document.getElementById('left-panel').style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => { vDragging = false; vHandle.classList.remove('dragging'); });
+
+  // Vertical: right panel width
+  const vHandle2 = document.getElementById('resize-v2');
+  let v2Dragging = false, v2StartX = 0, v2StartW = 0;
+  vHandle2.addEventListener('mousedown', (e) => {
+    v2Dragging = true; v2StartX = e.clientX;
+    v2StartW = document.getElementById('right-panel').offsetWidth;
+    vHandle2.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!v2Dragging) return;
+    const delta = v2StartX - e.clientX;
+    const w = Math.max(160, Math.min(440, v2StartW + delta));
+    document.getElementById('right-panel').style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => { v2Dragging = false; vHandle2.classList.remove('dragging'); });
+
+  // Horizontal: left bottom height
+  const hHandle = document.getElementById('resize-h');
+  let hDragging = false, hStartY = 0, hStartH = 0;
+  hHandle.addEventListener('mousedown', (e) => {
+    hDragging = true; hStartY = e.clientY;
+    hStartH = document.getElementById('left-bottom').offsetHeight;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!hDragging) return;
+    const delta = hStartY - e.clientY;
+    const h = Math.max(80, Math.min(600, hStartH + delta));
+    document.getElementById('left-bottom').style.height = h + 'px';
+    document.getElementById('thumb-scroll').style.maxHeight = (h - 40) + 'px';
+  });
+  document.addEventListener('mouseup', () => { hDragging = false; });
+}
+
+// ================================================================
+// RECEIVE ITEMS FROM PARENT (postMessage)
+// ================================================================
+window.addEventListener('message', (e) => {
+  const { type, items, rootPath } = e.data || {};
+  if (type === 'set-items' && Array.isArray(items)) {
+    allItems = items;
+    buildFolderTree();
+  }
+});
+</script>
+</body>
+</html>

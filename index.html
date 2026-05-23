@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Manager</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+
+    /* ==================== TOPBAR ==================== */
+    #topbar {
+      height: 52px;
+      background: #111;
+      border-bottom: 1px solid #1e1e1e;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+    }
+
+    .app-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0077ee;
+      letter-spacing: 0.3px;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+
+    .topbar-sep { width: 1px; height: 26px; background: #1e1e1e; flex-shrink: 0; }
+
+    .tab-group { display: flex; gap: 3px; }
+
+    .tab-btn {
+      padding: 5px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: #555;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover:not(:disabled) { background: #181818; border-color: #2a2a2a; color: #aaa; }
+    .tab-btn.active { background: #0a1a2a; border-color: #0055aa; color: #4db3ff; font-weight: 600; }
+    .tab-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    /* Aktiver Scanner-Tab leuchtet grün */
+    .tab-btn.scanner-active { background: #0a180a; border-color: #1a5a1a; color: #44cc44; font-weight: 600; }
+
+    .file-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      min-width: 0;
+      max-width: 340px;
+      overflow: hidden;
+    }
+
+    .file-chip-icon { font-size: 12px; flex-shrink: 0; color: #0077ee; }
+    .file-chip-name { font-size: 10px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Consolas', monospace; }
+    .file-chip-name.loaded { color: #4db3ff; }
+
+    .ctrl-group { display: flex; align-items: center; gap: 6px; }
+    .ctrl-label { font-size: 10px; color: #444; white-space: nowrap; }
+    .ctrl-select {
+      padding: 4px 7px;
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 3px;
+      color: #888;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .ctrl-select:focus { outline: none; border-color: #0055aa; }
+
+    .info-group { margin-left: auto; display: flex; gap: 5px; flex-shrink: 0; }
+    .info-badge {
+      padding: 3px 9px;
+      background: #0a0a0a;
+      border: 1px solid #161616;
+      border-radius: 3px;
+      font-size: 10px;
+      color: #333;
+      white-space: nowrap;
+    }
+    .info-badge strong { color: #0055aa; margin-right: 2px; }
+    .info-badge.live { color: #777; border-color: #1e1e1e; }
+
+    /* ==================== VIEW CONTAINER ==================== */
+    #view-container { height: calc(100vh - 52px); position: relative; }
+
+    .view-frame { width: 100%; height: 100%; border: none; display: none; background: #0a0a0a; }
+    .view-frame.active { display: block; }
+
+    /* Loader-Wrapper (enthält Welcome-Screen + scan-view iframe) */
+    #view-scan-wrapper { width: 100%; height: 100%; background: #0a0a0a; }
+    #view-scan-wrapper.hidden { display: none; }
+
+    #welcome-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      z-index: 10;
+    }
+    #welcome-overlay.hidden { display: none; }
+
+    .welcome-card {
+      background: #0f0f0f;
+      border: 1px solid #1a1a1a;
+      border-radius: 10px;
+      padding: 44px 52px;
+      max-width: 480px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .welcome-icon { font-size: 44px; margin-bottom: 18px; }
+    .welcome-title { font-size: 20px; font-weight: 700; color: #ddd; margin-bottom: 8px; }
+    .welcome-subtitle { font-size: 13px; color: #444; margin-bottom: 28px; line-height: 1.6; }
+
+    .welcome-actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+    .welcome-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 26px;
+      background: #0066cc;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      width: 100%;
+      justify-content: center;
+    }
+    .welcome-btn:hover { background: #0077ee; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,102,204,0.3); }
+
+    .welcome-btn.secondary {
+      background: #111;
+      border: 1px solid #1e4a1e;
+      color: #44aa44;
+    }
+    .welcome-btn.secondary:hover { background: #0a180a; border-color: #2a7a2a; }
+
+    .welcome-hint { font-size: 11px; color: #2a2a2a; line-height: 1.6; margin-top: 14px; }
+    .welcome-hint code { background: #161616; padding: 1px 5px; border-radius: 2px; color: #555; font-size: 10px; }
+
+    /* Loading Overlay */
+    #loading-overlay {
+      position: fixed;
+      inset: 52px 0 0 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(3px);
+    }
+    #loading-overlay.active { display: flex; }
+
+    .loading-card {
+      background: #111;
+      border: 1px solid #222;
+      padding: 28px 44px;
+      border-radius: 8px;
+      text-align: center;
+      min-width: 300px;
+    }
+
+    .loading-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #1a1a1a;
+      border-top-color: #0077ee;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title { font-size: 14px; color: #ccc; margin-bottom: 5px; }
+    .loading-detail { font-size: 11px; color: #555; }
+  </style>
+</head>
+<body>
+
+<!-- ==================== TOPBAR ==================== -->
+<div id="topbar">
+  <span class="app-title">📹 MEDIA MANAGER</span>
+
+  <div class="topbar-sep"></div>
+
+  <div class="tab-group">
+    <button class="tab-btn active" data-view="scan" onclick="switchView('scan')">📂 Laden</button>
+    <button class="tab-btn" id="tab-scanner" data-view="scanner" onclick="switchView('scanner')">🔍 Scanner</button>
+    <button class="tab-btn" id="tab-grid" data-view="grid" onclick="switchView('grid')" disabled>▦ Grid</button>
+    <button class="tab-btn" id="tab-detail" data-view="detail" onclick="switchView('detail')" disabled>☰ Detail</button>
+    <button class="tab-btn" id="tab-label" data-view="label" onclick="switchView('label')" disabled>🏷️ Labels</button>
+  </div>
+
+  <div class="topbar-sep"></div>
+
+  <div class="file-chip">
+    <span class="file-chip-icon">📄</span>
+    <span class="file-chip-name" id="file-chip-name">Keine Datei geladen</span>
+  </div>
+
+  <div class="topbar-sep"></div>
+
+  <!-- Grid-Einstellungen (nur sichtbar im Grid-Tab) -->
+  <div class="ctrl-group" id="grid-settings" style="display:none">
+    <span class="ctrl-label">Spalten:</span>
+    <select class="ctrl-select" id="set-columns" onchange="applyGridSettings()">
+      <option value="2">2</option><option value="3">3</option>
+      <option value="4">4</option><option value="5" selected>5</option>
+      <option value="6">6</option><option value="7">7</option>
+      <option value="8">8</option><option value="10">10</option>
+      <option value="12">12</option>
+    </select>
+    <span class="ctrl-label">Ordner ab:</span>
+    <select class="ctrl-select" id="set-threshold" onchange="applyGridSettings()">
+      <option value="3">3</option><option value="5" selected>5</option>
+      <option value="10">10</option><option value="20">20</option>
+      <option value="50">50</option>
+    </select>
+  </div>
+
+  <!-- Info-Badges -->
+  <div class="info-group">
+    <div class="info-badge" id="badge-total"><strong>Gesamt:</strong><span id="info-total">—</span></div>
+    <div class="info-badge" id="badge-videos"><strong>Videos:</strong><span id="info-videos">—</span></div>
+    <div class="info-badge" id="badge-images"><strong>Bilder:</strong><span id="info-images">—</span></div>
+  </div>
+</div>
+
+<!-- ==================== VIEW CONTAINER ==================== -->
+<div id="view-container">
+
+  <!-- LADEN-Tab (Welcome-Screen + Loader iframe) -->
+  <div id="view-scan-wrapper" class="view-frame active" style="display:block; position:relative;">
+    <div id="welcome-overlay">
+      <div class="welcome-card">
+        <div class="welcome-icon">🗂️</div>
+        <div class="welcome-title">Media Manager</div>
+        <div class="welcome-subtitle">
+          Scanne einen Ordner oder lade eine vorhandene <strong>media_data.json</strong>.
+        </div>
+        <div class="welcome-actions">
+          <button class="welcome-btn secondary" onclick="switchView('scanner')">🔍 Ordner scannen</button>
+          <button class="welcome-btn" onclick="selectJsonFile()">📄 media_data.json laden</button>
+        </div>
+        <div class="welcome-hint">
+          Der Scanner erstellt automatisch eine <code>media_data.json</code> im Ordner.<br>
+          Danach kann sie hier geladen werden.
+        </div>
+      </div>
+    </div>
+    <iframe id="view-scan" style="width:100%;height:100%;border:none;display:none;" src="scan-view.html"></iframe>
+  </div>
+
+  <!-- SCANNER-Tab -->
+  <iframe id="view-scanner" class="view-frame" src="scanner-view.html"></iframe>
+
+  <!-- GRID-Tab -->
+  <iframe id="view-grid" class="view-frame" src="grid-view.html"></iframe>
+
+  <!-- DETAIL-Tab -->
+  <iframe id="view-detail" class="view-frame" src="detail-view.html"></iframe>
+
+  <!-- Label-Tab -->
+   <iframe id="view-label" class="view-frame" src="label-view.html"></iframe>
+</div>
+
+<!-- Loading Overlay (JSON-Vorbereitung) -->
+<div id="loading-overlay">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div class="loading-title" id="loading-title">Vorbereite…</div>
+    <div class="loading-detail" id="loading-detail"></div>
+  </div>
+</div>
+
+<!-- ==================== SCRIPTS ==================== -->
+<script src="state.js"></script>
+<script>
+const state = AppState.getInstance();
+let activeView = 'scan';
+
+// ==================== INIT ====================
+function init() {
+  console.log('[INDEX] Init');
+
+  state.on('items-chunk-added', onChunkAdded);
+  state.on('items-changed', onItemsChanged);
+  state.on('root-changed', updateBadges);
+
+  // IPC-Events an die jeweiligen iframes weiterleiten (postMessage)
+  // da IPC-Events nur im Top-Level-Frame ankommen
+  if (typeof window.electron?.on === 'function') {
+    window.electron.on('system-status-update', (status) => {
+      forwardToIframe('view-scan', { type: 'system-status-update', status });
+    });
+
+    window.electron.on('scan-progress', (data) => {
+      forwardToIframe('view-scanner', { type: 'scan-progress', data });
+    });
+  }
+
+  console.log('[INDEX] Bereit');
+}
+
+function forwardToIframe(iframeId, message) {
+  try {
+    const iframe = document.getElementById(iframeId);
+    if (iframe?.contentWindow) iframe.contentWindow.postMessage(message, '*');
+  } catch { }
+}
+
+// ==================== STATE LISTENER ====================
+function onChunkAdded() { updateBadges(); unlockMediaTabs(); }
+    forwardToIframe('view-label', { type: 'set-items', items: state.getMediaItems() });
+function onItemsChanged() { updateBadges(); unlockMediaTabs(); }
+    forwardToIframe('view-label', { type: 'set-items', items: state.getMediaItems() });
+
+// ==================== JSON DATEI AUSWÄHLEN ====================
+async function selectJsonFile() {
+  if (typeof window.electron === 'undefined') {
+    alert('FEHLER: Electron-Bridge nicht verfügbar.\nPreload.js wurde nicht geladen.');
+    return;
+  }
+  try {
+    const filePath = await window.electron.invoke('select-json-file');
+    if (!filePath) return;
+    await loadJsonFile(filePath);
+  } catch (e) {
+    alert('Fehler beim Öffnen des Datei-Dialogs:\n\n' + e.message);
+  }
+}
+
+// ==================== JSON DATEI LADEN ====================
+// Wird auch vom Scanner-Tab über loadResultJson() aufgerufen.
+async function loadJsonFile(filePath) {
+  console.log('[INDEX] loadJsonFile:', filePath);
+
+  state.clearMediaItems();
+
+  document.getElementById('welcome-overlay').classList.add('hidden');
+  document.getElementById('view-scan').style.display = 'block';
+  switchView('scan');
+
+  const chip = document.getElementById('file-chip-name');
+  chip.textContent = filePath;
+  chip.classList.add('loaded');
+
+  state.setJsonFilePath(filePath);
+
+  try {
+    await waitForScanView();
+  } catch (e) {
+    console.error('[INDEX] scan-view Timeout:', e.message);
+    alert('scan-view.html konnte nicht geladen werden:\n' + e.message);
+    return;
+  }
+
+  const scanView = document.getElementById('view-scan').contentWindow;
+  if (scanView && typeof scanView.startChunkLoading === 'function') {
+    scanView.startChunkLoading(filePath);
+  } else {
+    console.error('[INDEX] startChunkLoading nicht gefunden');
+    alert('Interner Fehler: startChunkLoading nicht gefunden.\nSiehe DevTools Console.');
+  }
+}
+
+// Pollt bis startChunkLoading im scan-view iframe bereit ist
+function waitForScanView() {
+  return new Promise((resolve, reject) => {
+    let tries = 0;
+    const check = () => {
+      tries++;
+      const cw = document.getElementById('view-scan').contentWindow;
+      if (cw && typeof cw.startChunkLoading === 'function') { resolve(); return; }
+      if (tries >= 100) { reject(new Error('scan-view nicht bereit nach 5s')); return; }
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+// ==================== VIEW WECHSELN ====================
+function switchView(viewName) {
+  if ((viewName === 'grid' || viewName === 'detail') && state.getMediaItems().length === 0) return;
+
+  activeView = viewName;
+
+  // Alle Views ausblenden
+  document.getElementById('view-scan-wrapper').style.display = 'none';
+  document.getElementById('view-scanner').classList.remove('active');
+  document.getElementById('view-grid').classList.remove('active');
+  document.getElementById('view-detail').classList.remove('active');
+   document.getElementById('view-label').classList.remove('active');
+
+  if (viewName === 'scan') {
+    document.getElementById('view-scan-wrapper').style.display = 'block';
+  } else if (viewName === 'scanner') {
+    document.getElementById('view-scanner').classList.add('active');
+  } else if (viewName === 'grid') {
+    document.getElementById('view-grid').classList.add('active');
+  } else if (viewName === 'detail') {
+    document.getElementById('view-detail').classList.add('active');
+  } else if (viewName === 'label') {
+  document.getElementById('view-label').classList.add('active');
+  }
+
+  // Tab-Buttons aktualisieren
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active', 'scanner-active');
+    if (btn.dataset.view === viewName) {
+      btn.classList.add(viewName === 'scanner' ? 'scanner-active' : 'active');
+    }
+  });
+
+  // Grid-Einstellungen nur im Grid-Tab zeigen
+  document.getElementById('grid-settings').style.display = viewName === 'grid' ? 'flex' : 'none';
+}
+
+// ==================== TABS FREISCHALTEN ====================
+function unlockMediaTabs() {
+  const has = state.getMediaItems().length > 0;
+  document.getElementById('tab-grid').disabled = !has;
+  document.getElementById('tab-detail').disabled = !has;
+    document.getElementById('tab-label').disabled = !has;
+}
+
+// ==================== TOPBAR BADGES ====================
+function updateBadges() {
+  const s = state.getStats();
+  const set = (id, val) => { document.getElementById(id).textContent = val || '—'; };
+  set('info-total',  s.total  > 0 ? s.total.toLocaleString('de-DE')  : null);
+  set('info-videos', s.videos > 0 ? s.videos.toLocaleString('de-DE') : null);
+  set('info-images', s.images > 0 ? s.images.toLocaleString('de-DE') : null);
+  if (s.total > 0) {
+    ['badge-total','badge-videos','badge-images'].forEach(id => document.getElementById(id).classList.add('live'));
+  }
+}
+
+// ==================== GRID-EINSTELLUNGEN ====================
+function applyGridSettings() {
+  const columns = parseInt(document.getElementById('set-columns').value);
+  const threshold = parseInt(document.getElementById('set-threshold').value);
+  forwardToIframe('view-grid', { type: 'update-grid-settings', columns, threshold });
+  if (state.config?.grid) {
+    state.config.grid.defaultColumns = columns;
+    state.config.grid.folderStackThreshold = threshold;
+  }
+}
+
+// ==================== LOADING OVERLAY ====================
+function showLoading(title, detail = '') {
+  document.getElementById('loading-title').textContent = title;
+  document.getElementById('loading-detail').textContent = detail;
+  document.getElementById('loading-overlay').classList.add('active');
+}
+function hideLoading() { document.getElementById('loading-overlay').classList.remove('active'); }
+
+// ==================== START ====================
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

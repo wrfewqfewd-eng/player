@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>IPC Connection Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #0066cc;
+      margin-bottom: 30px;
+    }
+    
+    .test-section {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+    
+    .test-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+    
+    .test-result {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    
+    .success {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid #4caf50;
+      color: #4caf50;
+    }
+    
+    .error {
+      background: rgba(244, 67, 54, 0.2);
+      border: 1px solid #f44336;
+      color: #f44336;
+    }
+    
+    .info {
+      background: rgba(33, 150, 243, 0.2);
+      border: 1px solid #2196f3;
+      color: #2196f3;
+    }
+    
+    button {
+      padding: 10px 20px;
+      background: #0066cc;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    
+    button:hover {
+      background: #0052a3;
+    }
+    
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔧 IPC Connection Test</h1>
+
+<!-- Test 1: window.electron exists -->
+<div class="test-section">
+  <div class="test-title">Test 1: window.electron vorhanden?</div>
+  <div id="test1-result" class="test-result">Prüfe...</div>
+</div>
+
+<!-- Test 2: window.electron.invoke exists -->
+<div class="test-section">
+  <div class="test-title">Test 2: window.electron.invoke vorhanden?</div>
+  <div id="test2-result" class="test-result">Prüfe...</div>
+</div>
+
+<!-- Test 3: Ordner-Dialog -->
+<div class="test-section">
+  <div class="test-title">Test 3: Ordner-Dialog öffnen</div>
+  <button onclick="testSelectFolder()">Test starten</button>
+  <div id="test3-result" class="test-result info">Klicke auf den Button</div>
+</div>
+
+<!-- Test 4: scan-media -->
+<div class="test-section">
+  <div class="test-title">Test 4: scan-media IPC Call</div>
+  <input type="text" id="test-path" placeholder="E:\Neuer Ordner\..." style="width: 400px; padding: 8px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px;">
+  <button onclick="testScanMedia()">Test starten</button>
+  <div id="test4-result" class="test-result info">Gib einen Pfad ein und klicke auf den Button</div>
+</div>
+
+<!-- Console Log -->
+<div class="test-section">
+  <div class="test-title">Console Log</div>
+  <div id="console-log" class="test-result info" style="max-height: 300px; overflow-y: auto;">
+    <pre id="log-content"></pre>
+  </div>
+</div>
+
+<script>
+// Console Log abfangen
+const logContent = document.getElementById('log-content');
+const originalLog = console.log;
+const originalError = console.error;
+
+console.log = function(...args) {
+  originalLog.apply(console, args);
+  logContent.textContent += args.join(' ') + '\n';
+  logContent.parentElement.scrollTop = logContent.parentElement.scrollHeight;
+};
+
+console.error = function(...args) {
+  originalError.apply(console, args);
+  logContent.textContent += '[ERROR] ' + args.join(' ') + '\n';
+  logContent.parentElement.scrollTop = logContent.parentElement.scrollHeight;
+};
+
+console.log('=== IPC Connection Test gestartet ===');
+
+// Test 1: window.electron exists
+function test1() {
+  const result = document.getElementById('test1-result');
+  
+  if (typeof window.electron === 'undefined') {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ FEHLER: window.electron ist undefined!\n\nDas bedeutet, dass preload.js nicht korrekt geladen wurde.</pre>';
+    console.error('Test 1 FAILED: window.electron ist undefined');
+    return false;
+  } else {
+    result.className = 'test-result success';
+    result.innerHTML = '<pre>✅ SUCCESS: window.electron ist vorhanden\n\nTyp: ' + typeof window.electron + '</pre>';
+    console.log('Test 1 PASSED: window.electron ist vorhanden');
+    return true;
+  }
+}
+
+// Test 2: window.electron.invoke exists
+function test2() {
+  const result = document.getElementById('test2-result');
+  
+  if (typeof window.electron === 'undefined') {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ Übersprungen (Test 1 fehlgeschlagen)</pre>';
+    return false;
+  }
+  
+  if (typeof window.electron.invoke !== 'function') {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ FEHLER: window.electron.invoke ist keine Funktion!\n\nTyp: ' + typeof window.electron.invoke + '</pre>';
+    console.error('Test 2 FAILED: window.electron.invoke ist keine Funktion');
+    return false;
+  } else {
+    result.className = 'test-result success';
+    result.innerHTML = '<pre>✅ SUCCESS: window.electron.invoke ist verfügbar</pre>';
+    console.log('Test 2 PASSED: window.electron.invoke ist verfügbar');
+    return true;
+  }
+}
+
+// Test 3: Ordner-Dialog
+async function testSelectFolder() {
+  const result = document.getElementById('test3-result');
+  
+  if (typeof window.electron === 'undefined' || typeof window.electron.invoke !== 'function') {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ Test 1 oder 2 fehlgeschlagen</pre>';
+    return;
+  }
+  
+  result.className = 'test-result info';
+  result.innerHTML = '<pre>Öffne Ordner-Dialog...</pre>';
+  console.log('Test 3: Rufe select-folder auf...');
+  
+  try {
+    const path = await window.electron.invoke('select-folder');
+    console.log('Test 3: Ergebnis:', path);
+    
+    if (path) {
+      result.className = 'test-result success';
+      result.innerHTML = '<pre>✅ SUCCESS: Ordner gewählt\n\nPfad: ' + path + '</pre>';
+    } else {
+      result.className = 'test-result info';
+      result.innerHTML = '<pre>ℹ️ Abgebrochen (kein Ordner gewählt)</pre>';
+    }
+  } catch (error) {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ FEHLER:\n\n' + error.message + '\n\nStack:\n' + error.stack + '</pre>';
+    console.error('Test 3 ERROR:', error);
+  }
+}
+
+// Test 4: scan-media
+async function testScanMedia() {
+  const result = document.getElementById('test4-result');
+  const pathInput = document.getElementById('test-path');
+  const testPath = pathInput.value.trim();
+  
+  if (!testPath) {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ Bitte einen Pfad eingeben</pre>';
+    return;
+  }
+  
+  if (typeof window.electron === 'undefined' || typeof window.electron.invoke !== 'function') {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ Test 1 oder 2 fehlgeschlagen</pre>';
+    return;
+  }
+  
+  result.className = 'test-result info';
+  result.innerHTML = '<pre>Rufe scan-media auf...\n\nPfad: ' + testPath + '</pre>';
+  console.log('Test 4: Rufe scan-media auf mit:', testPath);
+  
+  try {
+    const scanResult = await window.electron.invoke('scan-media', testPath);
+    console.log('Test 4: Ergebnis:', scanResult);
+    
+    if (scanResult === undefined) {
+      result.className = 'test-result error';
+      result.innerHTML = '<pre>❌ FEHLER: Ergebnis ist undefined!\n\nDas Backend hat nichts zurückgegeben.\nÜberprüfe das Terminal-Log vom Backend.</pre>';
+    } else if (scanResult === null) {
+      result.className = 'test-result error';
+      result.innerHTML = '<pre>❌ FEHLER: Ergebnis ist null!</pre>';
+    } else if (scanResult.success) {
+      result.className = 'test-result success';
+      result.innerHTML = '<pre>✅ SUCCESS!\n\nItems: ' + scanResult.totalCount + '\nNeu: ' + scanResult.newCount + '\n\nErgebnis:\n' + JSON.stringify(scanResult, null, 2).substring(0, 500) + '...</pre>';
+    } else {
+      result.className = 'test-result error';
+      result.innerHTML = '<pre>❌ FEHLER:\n\n' + (scanResult.error || 'Unbekannter Fehler') + '</pre>';
+    }
+  } catch (error) {
+    result.className = 'test-result error';
+    result.innerHTML = '<pre>❌ EXCEPTION:\n\n' + error.message + '\n\nStack:\n' + error.stack + '</pre>';
+    console.error('Test 4 ERROR:', error);
+  }
+}
+
+// Auto-run Tests 1 & 2
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM geladen, starte automatische Tests...');
+  test1();
+  test2();
+});
+</script>
+
+</body>
+</html>

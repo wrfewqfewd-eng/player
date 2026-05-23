@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Datei laden</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .section {
+      padding: 22px 28px;
+      border-bottom: 1px solid #161616;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #3a3a3a;
+      margin-bottom: 14px;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: #0066cc; color: #fff; }
+    .btn-primary:hover { background: #0077ee; transform: translateY(-1px); }
+    .btn-secondary { background: #1a1a1a; border: 1px solid #2a2a2a; color: #999; }
+    .btn-secondary:hover:not(:disabled) { border-color: #0066cc; color: #fff; }
+    .btn-danger { background: #2a1010; border: 1px solid #5a2020; color: #ff6b6b; }
+    .btn-danger:hover:not(:disabled) { background: #3a1010; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .file-path-display {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      background: #0d0d0d;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #555;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: 'Consolas', monospace;
+    }
+
+    .file-path-display.active { color: #4db3ff; border-color: #1a3a5c; background: #0a1a2a; }
+
+    .monitor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .monitor-card {
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+
+    .monitor-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #444;
+      margin-bottom: 10px;
+    }
+
+    .monitor-bar-track {
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .monitor-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease, background 0.3s;
+    }
+
+    .bar-ok { background: #2a7a2a; }
+    .bar-warn { background: #8a6a00; }
+    .bar-crit { background: #8a2020; }
+
+    .monitor-values {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .monitor-main-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ccc;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .monitor-sub { font-size: 10px; color: #444; }
+
+    .monitor-status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 5px;
+      background: #2a7a2a;
+    }
+
+    .monitor-status-dot.warn { background: #cc9900; }
+    .monitor-status-dot.crit { background: #cc2222; animation: pulse-dot 0.8s infinite; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .progress-section { display: none; }
+    .progress-section.visible { display: block; }
+
+    .chunk-progress-track {
+      height: 10px;
+      background: #111;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      position: relative;
+    }
+
+    .chunk-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0055aa, #0099ff);
+      border-radius: 5px;
+      transition: width 0.3s ease;
+      position: relative;
+    }
+
+    .chunk-progress-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 30px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15));
+      animation: shimmer 1s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; }
+    }
+
+    .progress-paused .chunk-progress-fill { background: #5a4a00; }
+    .progress-paused .chunk-progress-fill::after { display: none; }
+
+    .progress-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .pstat {
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 5px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .pstat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ccc;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .pstat-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #3a3a3a;
+    }
+
+    .pstat.highlight .pstat-value { color: #4db3ff; }
+    .pstat.warn .pstat-value { color: #cc9900; }
+    .pstat.ok .pstat-value { color: #4a9a4a; }
+
+    .pause-banner {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #1a1200;
+      border: 1px solid #3a2a00;
+      border-radius: 5px;
+      font-size: 12px;
+      color: #cc9900;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pause-banner.visible { display: flex; }
+    .pause-banner-icon { font-size: 18px; }
+    .pause-banner-text { flex: 1; }
+    .pause-banner-text strong { display: block; margin-bottom: 2px; }
+    .pause-resume-btn {
+      padding: 6px 14px;
+      background: #2a2000;
+      border: 1px solid #5a4a00;
+      border-radius: 4px;
+      color: #cc9900;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+
+    .stat-card.blue { border-color: #1a3a5c; background: #0a1520; }
+
+    .stat-icon { font-size: 18px; margin-bottom: 8px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #ccc; line-height: 1; margin-bottom: 3px; }
+    .stat-card.blue .stat-value { color: #4db3ff; }
+    .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #3a3a3a; }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .filter-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 10px;
+      background: #111;
+      border: 1px solid #1e1e1e;
+      color: #555;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .pill:hover { border-color: #333; color: #888; }
+    .pill.active { background: #0a1a2a; border-color: #0055aa; color: #4db3ff; }
+
+    .list-count { margin-left: auto; font-size: 10px; color: #333; }
+
+    .file-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .file-table thead th {
+      padding: 8px 12px;
+      text-align: left;
+      color: #333;
+      font-weight: 600;
+      border-bottom: 1px solid #161616;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      position: sticky;
+      top: 0;
+      background: #0a0a0a;
+      user-select: none;
+    }
+
+    .file-table thead th:hover { color: #555; }
+
+    .file-table tbody tr {
+      border-bottom: 1px solid #0f0f0f;
+      transition: background 0.1s;
+    }
+
+    .file-table tbody tr:hover { background: #0f0f0f; }
+    .file-table td { padding: 7px 12px; color: #666; }
+    .file-table td.col-name { color: #aaa; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-table td.col-folder { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-table td.col-size { text-align: right; font-family: 'Consolas', monospace; font-size: 10px; }
+
+    .type-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .type-tag.video { background: rgba(0,102,204,0.2); color: #4499cc; }
+    .type-tag.image { background: rgba(76,175,80,0.2); color: #66aa66; }
+    .type-tag.unknown { background: rgba(80,80,80,0.2); color: #555; }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      justify-content: center;
+    }
+
+    .page-btn {
+      padding: 5px 10px;
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 3px;
+      color: #555;
+      font-size: 10px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .page-btn:hover:not(:disabled) { border-color: #333; color: #888; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-info { font-size: 10px; color: #333; }
+
+    .error-box {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #150a0a;
+      border: 1px solid #3a1515;
+      border-radius: 5px;
+    }
+    .error-box.visible { display: block; }
+    .error-title { font-size: 12px; font-weight: 700; color: #cc4444; margin-bottom: 6px; }
+    .error-msg { font-size: 11px; color: #aa3333; font-family: 'Consolas', monospace; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+
+<div class="section">
+  <div class="section-label">Datei laden</div>
+  <div class="file-row">
+    <button class="btn btn-primary" onclick="selectJsonFile()">📄 media_data.json auswählen</button>
+    <button class="btn btn-secondary" id="btn-reload" onclick="reloadCurrentFile()" disabled>🔄 Neu laden</button>
+    <button class="btn btn-danger" id="btn-abort" onclick="abortLoading()" disabled>✕ Abbrechen</button>
+    <div class="file-path-display" id="file-path-display">Noch keine Datei ausgewählt</div>
+  </div>
+  <div class="error-box" id="error-box">
+    <div class="error-title">⚠ Fehler</div>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">System-Status</div>
+  <div class="monitor-grid">
+
+    <div class="monitor-card">
+      <div class="monitor-title">
+        <span class="monitor-status-dot" id="ram-dot"></span>Arbeitsspeicher (RAM)
+      </div>
+      <div class="monitor-main-value" id="ram-used">— GB</div>
+      <div class="monitor-bar-track">
+        <div class="monitor-bar-fill bar-ok" id="ram-bar" style="width:0%"></div>
+      </div>
+      <div class="monitor-values">
+        <span class="monitor-sub" id="ram-free">Frei: —</span>
+        <span class="monitor-sub" id="ram-total">Gesamt: —</span>
+      </div>
+    </div>
+
+    <div class="monitor-card">
+      <div class="monitor-title">
+        <span class="monitor-status-dot" id="disk-dot"></span>Datenträger
+      </div>
+      <div class="monitor-main-value" id="disk-speed">— MB/s</div>
+      <div class="monitor-bar-track">
+        <div class="monitor-bar-fill bar-ok" id="disk-bar" style="width:0%"></div>
+      </div>
+      <div class="monitor-values">
+        <span class="monitor-sub" id="disk-latency">Latenz: —</span>
+        <span class="monitor-sub" id="disk-status">—</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section progress-section" id="progress-section">
+  <div class="section-label">Ladefortschritt</div>
+
+  <div class="chunk-progress-track">
+    <div class="chunk-progress-fill" id="progress-bar" style="width:0%"></div>
+  </div>
+
+  <div class="progress-stats">
+    <div class="pstat highlight">
+      <div class="pstat-value" id="pstat-chunks">0 / 0</div>
+      <div class="pstat-label">Pakete geladen</div>
+    </div>
+    <div class="pstat highlight">
+      <div class="pstat-value" id="pstat-items">0</div>
+      <div class="pstat-label">Dateien geladen</div>
+    </div>
+    <div class="pstat" id="pstat-ram-card">
+      <div class="pstat-value" id="pstat-ram">— MB</div>
+      <div class="pstat-label">RAM frei</div>
+    </div>
+    <div class="pstat" id="pstat-next-pause-card">
+      <div class="pstat-value" id="pstat-next-pause">—</div>
+      <div class="pstat-label">Pakete bis Pause</div>
+    </div>
+  </div>
+
+  <div class="pause-banner" id="pause-banner">
+    <div class="pause-banner-icon">⏸</div>
+    <div class="pause-banner-text">
+      <strong>Laden pausiert — RAM zu gering</strong>
+      <span id="pause-reason">Warte auf freien Arbeitsspeicher…</span>
+    </div>
+    <button class="pause-resume-btn" onclick="manualResume()">▶ Jetzt fortsetzen</button>
+  </div>
+
+</div>
+
+<div class="section" id="stats-section" style="display:none">
+  <div class="section-label">Übersicht</div>
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-icon">📁</div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Dateien gesamt</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🎬</div>
+      <div class="stat-value" id="stat-videos">—</div>
+      <div class="stat-label">Videos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🖼️</div>
+      <div class="stat-value" id="stat-images">—</div>
+      <div class="stat-label">Bilder</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📂</div>
+      <div class="stat-value" id="stat-folders">—</div>
+      <div class="stat-label">Hauptordner</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📁</div>
+      <div class="stat-value" id="stat-subfolders">—</div>
+      <div class="stat-label">Unterordner</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-icon">💾</div>
+      <div class="stat-value" id="stat-gb">—</div>
+      <div class="stat-label">Gesamt GB</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">❓</div>
+      <div class="stat-value" id="stat-other">—</div>
+      <div class="stat-label">Sonstiges</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="list-section" style="display:none">
+  <div class="list-header">
+    <div class="section-label" style="margin-bottom:0">Geladene Dateien</div>
+    <div class="filter-pills">
+      <button class="pill active" data-t="all" onclick="setFilter('all')">Alle</button>
+      <button class="pill" data-t="video" onclick="setFilter('video')">🎬 Videos</button>
+      <button class="pill" data-t="image" onclick="setFilter('image')">🖼️ Bilder</button>
+      <button class="pill" data-t="unknown" onclick="setFilter('unknown')">❓ Unbekannt</button>
+    </div>
+    <div class="list-count" id="list-count"></div>
+  </div>
+
+  <table class="file-table">
+    <thead>
+      <tr>
+        <th style="width:55px" onclick="sortBy('type')">Typ</th>
+        <th onclick="sortBy('name')">Dateiname</th>
+        <th onclick="sortBy('folder')">Ordner</th>
+        <th style="width:80px; text-align:right" onclick="sortBy('size')">Größe</th>
+        <th style="width:100px" onclick="sortBy('date')">Datum</th>
+      </tr>
+    </thead>
+    <tbody id="list-tbody"></tbody>
+  </table>
+
+  <div class="pagination">
+    <button class="page-btn" id="btn-prev" onclick="changePage(-1)" disabled>← Zurück</button>
+    <span class="page-info" id="page-info">Seite 1</span>
+    <button class="page-btn" id="btn-next" onclick="changePage(1)">Weiter →</button>
+  </div>
+</div>
+
+<script>
+// ==================== GLOBALS ====================
+let state = null;
+
+let loadingActive = false;
+let loadingPaused = false;
+let loadedChunks = 0;
+let totalChunks = 0;
+let loadedItemCount = 0;
+let totalItemCount = 0;
+
+let allItems = [];
+let filteredItems = [];
+let activeFilter = 'all';
+let currentSort = { key: 'name', dir: 'asc' };
+let currentPage = 1;
+const PAGE_SIZE = 100;
+
+let lastFreeRamMB = 9999;
+const RAM_PAUSE_THRESHOLD = 300;
+const RAM_RESUME_THRESHOLD = 500;
+
+// ==================== INIT ====================
+function init() {
+  console.log('[SCAN] Init');
+  state = parent.AppState.getInstance();
+
+  startMonitor();
+
+  state.on('scan-stats-changed', renderStats);
+  state.on('json-file-changed', onJsonFileChanged);
+
+  if (state.getScanStats()) renderStats(state.getScanStats());
+  if (state.getJsonFilePath()) onJsonFileChanged(state.getJsonFilePath());
+  if (state.getMediaItems().length > 0) {
+    allItems = [...state.getMediaItems()];
+    applyFilter();
+    showSection('list-section');
+  }
+}
+
+// ==================== SYSTEM MONITOR ====================
+// IPC-Events können nur im Top-Level-Frame empfangen werden.
+// Der parent leitet 'system-status-update' via postMessage weiter.
+// Zusätzlich wird electron.on direkt auf dem parent-Kontext registriert.
+async function startMonitor() {
+  if (typeof parent.window.electron?.invoke === 'function') {
+    await parent.window.electron.invoke('start-system-monitor', 800);
+  }
+
+  if (typeof parent.window.electron?.on === 'function') {
+    parent.window.electron.on('system-status-update', updateMonitorUI);
+  }
+
+  // Fallback: postMessage vom parent (index.html leitet Events weiter)
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.type === 'system-status-update') {
+      updateMonitorUI(ev.data.status);
+    }
+  });
+}
+
+function updateMonitorUI(status) {
+  if (!status) return;
+  const { ram, disk } = status;
+
+  const ramDot = document.getElementById('ram-dot');
+  const ramBar = document.getElementById('ram-bar');
+  document.getElementById('ram-used').textContent = (ram.usedMB / 1024).toFixed(1) + ' GB';
+  document.getElementById('ram-free').textContent = 'Frei: ' + ram.freeMB + ' MB';
+  document.getElementById('ram-total').textContent = 'Gesamt: ' + (ram.totalMB / 1024).toFixed(1) + ' GB';
+  ramBar.style.width = ram.usedPercent + '%';
+
+  if (ram.critical) {
+    ramBar.className = 'monitor-bar-fill bar-crit';
+    ramDot.className = 'monitor-status-dot crit';
+  } else if (ram.warning) {
+    ramBar.className = 'monitor-bar-fill bar-warn';
+    ramDot.className = 'monitor-status-dot warn';
+  } else {
+    ramBar.className = 'monitor-bar-fill bar-ok';
+    ramDot.className = 'monitor-status-dot';
+  }
+
+  lastFreeRamMB = ram.freeMB;
+
+  if (disk.readSpeedMBs !== null) {
+    document.getElementById('disk-speed').textContent = disk.readSpeedMBs + ' MB/s';
+    const diskPercent = Math.min(100, (disk.readSpeedMBs / 500) * 100);
+    const diskBar = document.getElementById('disk-bar');
+    diskBar.style.width = diskPercent + '%';
+    diskBar.className = disk.healthy ? 'monitor-bar-fill bar-ok' : 'monitor-bar-fill bar-warn';
+    document.getElementById('disk-dot').className = disk.healthy ? 'monitor-status-dot' : 'monitor-status-dot warn';
+  }
+  if (disk.latencyMs !== null) {
+    document.getElementById('disk-latency').textContent = 'Latenz: ' + disk.latencyMs + ' ms';
+    document.getElementById('disk-status').textContent = disk.healthy ? 'Reaktionsfähig' : 'Langsam';
+  }
+
+  if (loadingPaused && ram.freeMB >= RAM_RESUME_THRESHOLD) {
+    console.log('[SCAN] RAM erholt → auto-resume');
+    resumeLoading();
+  }
+
+  document.getElementById('pstat-ram').textContent = ram.freeMB + ' MB';
+  const pstatRamCard = document.getElementById('pstat-ram-card');
+  pstatRamCard.className = 'pstat' + (ram.critical ? ' warn' : ram.warning ? '' : ' ok');
+
+  if (loadingActive && !loadingPaused) {
+    const mbPerChunk = 2;
+    const pktBisPause = ram.critical ? 0 : Math.floor((ram.freeMB - RAM_PAUSE_THRESHOLD) / mbPerChunk);
+    document.getElementById('pstat-next-pause').textContent = ram.critical ? '!' : (pktBisPause > 999 ? '∞' : pktBisPause);
+    document.getElementById('pstat-next-pause-card').className = 'pstat' + (pktBisPause < 5 ? ' warn' : ' ok');
+  }
+}
+
+// ==================== JSON DATEI AUSWÄHLEN ====================
+function selectJsonFile() {
+  if (parent?.selectJsonFile) parent.selectJsonFile();
+}
+
+function reloadCurrentFile() {
+  const fp = state.getJsonFilePath();
+  if (fp && parent?.loadJsonFile) parent.loadJsonFile(fp);
+}
+
+function onJsonFileChanged(filePath) {
+  if (!filePath) return;
+  const el = document.getElementById('file-path-display');
+  el.textContent = filePath;
+  el.classList.add('active');
+  document.getElementById('btn-reload').disabled = false;
+}
+
+// ==================== CHUNK LOADING ====================
+// Wird von index.html aufgerufen nachdem die JSON-Datei ausgewählt wurde.
+async function startChunkLoading(jsonFilePath) {
+  console.log('[SCAN] startChunkLoading:', jsonFilePath);
+
+  hideError();
+  loadingActive = true;
+  loadingPaused = false;
+  loadedChunks = 0;
+  loadedItemCount = 0;
+  allItems = [];
+
+  document.getElementById('btn-abort').disabled = false;
+  document.getElementById('btn-reload').disabled = true;
+  showSection('progress-section');
+
+  let meta;
+  try {
+    meta = await parent.window.electron.invoke('prepare-media-cache', jsonFilePath);
+  } catch (e) {
+    showError('prepare-media-cache Fehler: ' + e.message);
+    finishLoading(false);
+    return;
+  }
+
+  if (!meta.success) {
+    showError(meta.error || 'Unbekannter Fehler');
+    finishLoading(false);
+    return;
+  }
+
+  totalChunks = meta.totalChunks;
+  totalItemCount = meta.totalItems;
+
+  state.setScanStats(meta.stats);
+  showSection('stats-section');
+  updateProgressUI();
+
+  await pumpChunks();
+}
+
+// Loop: fordert Chunks an bis alle geladen oder abgebrochen
+async function pumpChunks() {
+  while (loadingActive) {
+    if (loadingPaused) {
+      // Wird von resumeLoading() durch erneuten pumpChunks()-Aufruf fortgesetzt
+      return;
+    }
+
+    let chunk;
+    try {
+      chunk = await parent.window.electron.invoke('request-next-chunk', {
+        freeRamMB: lastFreeRamMB
+      });
+    } catch (e) {
+      showError('Chunk-Fehler: ' + e.message);
+      finishLoading(false);
+      return;
+    }
+
+    if (!chunk.success) {
+      finishLoading(false);
+      return;
+    }
+
+    if (chunk.paused) {
+      enterPauseState('RAM zu gering: ' + chunk.freeRamMB + ' MB frei — warte auf Erholung…');
+      return;
+    }
+
+    if (chunk.done) {
+      finishLoading(true);
+      return;
+    }
+
+    if (chunk.items && chunk.items.length > 0) {
+      state.appendMediaItems(chunk.items);
+      loadedItemCount += chunk.items.length;
+      allItems = state.getMediaItems();
+    }
+
+    loadedChunks = chunk.sentChunks;
+    updateProgressUI();
+
+    if (loadedChunks % 5 === 0) {
+      applyFilter();
+      showSection('list-section');
+    }
+
+    await sleep(25);
+  }
+}
+
+function enterPauseState(reason) {
+  loadingPaused = true;
+  document.getElementById('pause-reason').textContent = reason;
+  document.getElementById('pause-banner').classList.add('visible');
+  document.getElementById('progress-section').classList.add('progress-paused');
+  console.log('[SCAN] PAUSED:', reason);
+}
+
+function resumeLoading() {
+  if (!loadingActive) return;
+  loadingPaused = false;
+  document.getElementById('pause-banner').classList.remove('visible');
+  document.getElementById('progress-section').classList.remove('progress-paused');
+  console.log('[SCAN] RESUMED');
+  pumpChunks();
+}
+
+function manualResume() {
+  resumeLoading();
+}
+
+function abortLoading() {
+  loadingActive = false;
+  loadingPaused = false;
+  parent.window.electron.invoke('abort-load-session').catch(() => {});
+  finishLoading(false);
+  console.log('[SCAN] ABORTED by user');
+}
+
+function finishLoading(success) {
+  loadingActive = false;
+  loadingPaused = false;
+  document.getElementById('btn-abort').disabled = true;
+  document.getElementById('btn-reload').disabled = false;
+  document.getElementById('pause-banner').classList.remove('visible');
+
+  if (success) {
+    // items-changed auslösen damit Grid/Detail komplett neu rendern
+    state.finalizeLoading();
+    updateProgressUI();
+    allItems = state.getMediaItems();
+    applyFilter();
+    showSection('list-section');
+    console.log('[SCAN] DONE:', loadedItemCount, 'Items');
+  }
+}
+
+function updateProgressUI() {
+  const pct = totalChunks > 0 ? Math.round((loadedChunks / totalChunks) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('pstat-chunks').textContent = loadedChunks + ' / ' + totalChunks;
+  document.getElementById('pstat-items').textContent = loadedItemCount.toLocaleString('de-DE');
+}
+
+// ==================== STATS ====================
+function renderStats(stats) {
+  if (!stats) return;
+  document.getElementById('stat-total').textContent = fmt(stats.totalFiles);
+  document.getElementById('stat-videos').textContent = fmt(stats.videoCount);
+  document.getElementById('stat-images').textContent = fmt(stats.imageCount);
+  document.getElementById('stat-other').textContent = fmt(stats.otherCount);
+  document.getElementById('stat-folders').textContent = fmt(stats.folderCount);
+  document.getElementById('stat-subfolders').textContent = fmt(stats.subfolderCount);
+  document.getElementById('stat-gb').textContent = stats.totalGB;
+}
+
+// ==================== DATEI-LISTE ====================
+function applyFilter() {
+  filteredItems = activeFilter === 'all'
+    ? [...allItems]
+    : allItems.filter(i => i.type === activeFilter);
+  sortFiltered();
+  currentPage = 1;
+  renderTable();
+  updateListCount();
+}
+
+function setFilter(type) {
+  activeFilter = type;
+  document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.t === type));
+  applyFilter();
+}
+
+function sortBy(key) {
+  if (currentSort.key === key) currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+  else { currentSort.key = key; currentSort.dir = 'asc'; }
+  sortFiltered();
+  renderTable();
+}
+
+function sortFiltered() {
+  const m = currentSort.dir === 'asc' ? 1 : -1;
+  filteredItems.sort((a, b) => {
+    switch (currentSort.key) {
+      case 'name':   return m * (a.fileName || '').localeCompare(b.fileName || '');
+      case 'folder': return m * (a.folderPath || '').localeCompare(b.folderPath || '');
+      case 'size':   return m * ((a.size || 0) - (b.size || 0));
+      case 'date':   return m * ((a.created || 0) - (b.created || 0));
+      case 'type':   return m * (a.type || '').localeCompare(b.type || '');
+      default: return 0;
+    }
+  });
+}
+
+function renderTable() {
+  const tbody = document.getElementById('list-tbody');
+  tbody.innerHTML = '';
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, filteredItems.length);
+
+  for (let i = start; i < end; i++) {
+    const item = filteredItems[i];
+    const tr = document.createElement('tr');
+    const tc = item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'unknown';
+    const tl = item.type === 'video' ? '🎬 Video' : item.type === 'image' ? '🖼️ Bild' : '❓';
+    tr.innerHTML = `
+      <td><span class="type-tag ${tc}">${tl}</span></td>
+      <td class="col-name" title="${item.path || ''}">${item.fileName || '—'}</td>
+      <td class="col-folder" title="${item.folderPath || ''}">${item.folderPath || '—'}</td>
+      <td class="col-size">${fmtBytes(item.size)}</td>
+      <td>${fmtDate(item.created)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  updatePagination();
+}
+
+function updateListCount() {
+  document.getElementById('list-count').textContent =
+    fmt(filteredItems.length) + ' / ' + fmt(allItems.length) + ' Dateien';
+}
+
+function changePage(d) {
+  const max = Math.ceil(filteredItems.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(currentPage + d, max));
+  renderTable();
+}
+
+function updatePagination() {
+  const max = Math.ceil(filteredItems.length / PAGE_SIZE);
+  document.getElementById('page-info').textContent = `Seite ${currentPage} / ${max || 1}`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= max;
+}
+
+// ==================== HILFSFUNKTIONEN ====================
+function showSection(id) { document.getElementById(id).style.display = 'block'; }
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-box').classList.add('visible');
+}
+function hideError() { document.getElementById('error-box').classList.remove('visible'); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function fmt(n) { return n != null ? n.toLocaleString('de-DE') : '—'; }
+function fmtBytes(b) {
+  if (!b) return '—';
+  const k = 1024;
+  const s = ['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
