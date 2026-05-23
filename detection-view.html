@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Detection View</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #080808;
+  --bg1: #0f0f0f;
+  --bg2: #141414;
+  --bg3: #1a1a1a;
+  --bg4: #222;
+  --border: #1e1e1e;
+  --border2: #2a2a2a;
+  --text: #d0d0d0;
+  --text2: #888;
+  --text3: #555;
+  --accent: #0077ee;
+  --accent2: #0055bb;
+  --green: #22c55e;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --cyan: #06b6d4;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOOLBAR ─────────────────────────────────────── */
+#toolbar {
+  padding: 8px 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.tb-btn {
+  padding: 5px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text2);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.tb-btn:hover { background: var(--bg4); color: var(--text); }
+.tb-btn.active { background: rgba(0,119,238,0.15); border-color: var(--accent); color: #4db3ff; }
+.tb-btn.primary { background: var(--accent2); border-color: var(--accent); color: #fff; }
+.tb-btn.primary:hover { background: var(--accent); }
+
+.tb-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+.tb-label { font-size: 10px; color: var(--text3); white-space: nowrap; }
+
+#conf-slider {
+  -webkit-appearance: none;
+  width: 90px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg4);
+  outline: none;
+  cursor: pointer;
+}
+#conf-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+#conf-val {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: 'Consolas', monospace;
+  min-width: 32px;
+}
+
+.filter-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.pill {
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.pill:hover { border-color: #444; color: var(--text2); }
+.pill.active { background: rgba(0,119,238,0.12); border-color: var(--accent2); color: #4db3ff; }
+
+.spacer { flex: 1; }
+
+#item-counter { font-size: 10px; color: var(--text3); white-space: nowrap; }
+#item-counter strong { color: var(--accent); }
+
+/* ── MAIN SPLIT ──────────────────────────────────── */
+#main-split {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── LEFT: file list ─────────────────────────────── */
+#left-panel {
+  width: 260px;
+  min-width: 180px;
+  border-right: 1px solid var(--border);
+  background: var(--bg1);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+#left-header {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.panel-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 5px;
+}
+#file-search {
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+}
+#file-search:focus { outline: none; border-color: var(--accent); }
+#file-search::placeholder { color: var(--text3); }
+
+#file-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  margin: 1px 4px;
+  transition: background 0.1s;
+  position: relative;
+}
+.file-item:hover { background: var(--bg3); }
+.file-item.active { background: #0a1a2e; border-left: 2px solid var(--accent); padding-left: 8px; }
+
+.file-thumb {
+  width: 36px; height: 28px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.file-thumb img, .file-thumb video {
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.file-info { flex: 1; min-width: 0; }
+.file-name {
+  font-size: 11px;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-item.active .file-name { color: #4db3ff; }
+.file-item:hover .file-name { color: var(--text); }
+
+.file-det-count {
+  font-size: 9px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.file-det-count.has-hits { color: var(--orange); }
+
+/* detection bar preview (tiny) */
+.file-bar {
+  height: 3px;
+  border-radius: 1px;
+  margin-top: 3px;
+  background: var(--bg4);
+  overflow: hidden;
+  position: relative;
+}
+.file-bar-fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.3s;
+}
+
+/* ── CENTER: media + canvas overlay ─────────────── */
+#center-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  overflow: hidden;
+  position: relative;
+}
+
+#media-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+#stage-media-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#stage-img, #stage-video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  /* No object-fit — let the browser size the element to the image naturally */
+}
+#stage-video { display: none; }
+
+/* SVG overlay — sits exactly on the image */
+#box-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+#stage-placeholder {
+  color: var(--text3);
+  text-align: center;
+}
+#stage-placeholder .ph-icon { font-size: 48px; margin-bottom: 10px; opacity: 0.25; }
+#stage-placeholder .ph-text { font-size: 12px; }
+
+/* filename bar at bottom of stage */
+#stage-filename {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* nav arrows */
+#nav-arrows {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  padding: 0 8px;
+}
+.arrow-btn {
+  pointer-events: all;
+  width: 36px; height: 36px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--border2);
+  border-radius: 50%;
+  color: var(--text2);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.arrow-btn:hover { background: rgba(0,80,180,0.45); color: #fff; border-color: var(--accent); }
+
+/* ── BOTTOM: detection table ─────────────────────── */
+#bottom-panel {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  height: 180px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#bottom-header {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#bottom-header .panel-title { margin-bottom: 0; }
+#det-count-badge {
+  font-size: 9px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  padding: 1px 7px;
+  border-radius: 8px;
+  color: var(--text3);
+}
+#det-count-badge.has-hits { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--orange); }
+
+#det-table-wrap { flex: 1; overflow-y: auto; }
+
+.det-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.det-table thead {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg2);
+}
+.det-table th {
+  padding: 5px 12px;
+  text-align: left;
+  color: var(--text3);
+  font-weight: 700;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.det-table td {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: middle;
+}
+.det-table tr { cursor: pointer; transition: background 0.1s; }
+.det-table tr:hover { background: var(--bg3); }
+.det-table tr.highlighted { background: rgba(0,119,238,0.1); }
+.det-table tr.highlighted td { color: var(--text); }
+
+.class-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'Consolas', monospace;
+  white-space: nowrap;
+}
+
+/* confidence bar */
+.conf-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.conf-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--bg4);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.conf-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+.conf-pct {
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* box coords */
+.box-coord { font-family: 'Consolas', monospace; font-size: 10px; color: var(--text3); }
+
+/* empty state */
+.det-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ── RIGHT PANEL: class legend ───────────────────── */
+#right-panel {
+  width: 200px;
+  min-width: 160px;
+  border-left: 1px solid var(--border);
+  background: var(--bg1);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+#right-header {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+#legend-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 4px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s;
+  margin: 1px 0;
+}
+.legend-item:hover { background: var(--bg3); }
+.legend-item.dimmed { opacity: 0.35; }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { font-size: 10px; color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend-item:hover .legend-name { color: var(--text); }
+.legend-cnt {
+  font-size: 9px;
+  color: var(--text3);
+  font-family: 'Consolas', monospace;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ── RESIZE HANDLE ───────────────────────────────── */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.resize-handle:hover, .resize-handle.dragging { background: var(--accent); }
+
+/* ── SCROLLBARS ──────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+/* ── STATUS BAR ──────────────────────────────────── */
+#statusbar {
+  height: 20px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 14px;
+  font-size: 9px;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+.sb-item strong { color: var(--text2); margin-right: 2px; }
+
+/* ── TOOLTIP ─────────────────────────────────────── */
+#box-tooltip {
+  position: fixed;
+  background: rgba(0,0,0,0.92);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 10px;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+}
+
+/* ── JSON LOAD OVERLAY ───────────────────────────── */
+#load-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#load-overlay.show { display: flex; }
+.load-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 28px 32px;
+  text-align: center;
+  min-width: 300px;
+}
+.load-box h3 { font-size: 14px; margin-bottom: 8px; color: var(--text); }
+.load-box p { font-size: 11px; color: var(--text3); margin-bottom: 16px; }
+.load-drop-area {
+  border: 2px dashed var(--border2);
+  border-radius: 6px;
+  padding: 24px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 11px;
+  color: var(--text3);
+}
+.load-drop-area:hover, .load-drop-area.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,119,238,0.05);
+  color: var(--accent);
+}
+.load-drop-area .drop-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<!-- ── TOOLBAR ─────────────────────────────────── -->
+<div id="toolbar">
+  <button class="tb-btn primary" onclick="openLoadOverlay()">JSON laden</button>
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">Min. Score</span>
+  <input type="range" id="conf-slider" min="0" max="100" value="30"
+         oninput="onConfChange(this.value)">
+  <span id="conf-val">0.30</span>
+
+  <div class="tb-sep"></div>
+
+  <div class="filter-pills" id="class-filter-pills">
+    <button class="pill active" data-cls="ALL" onclick="setClassFilter('ALL')">Alle</button>
+  </div>
+
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-boxes" onclick="toggleBoxes()" title="Bounding Boxes ein/aus">Boxes</button>
+  <button class="tb-btn" id="btn-labels" onclick="toggleLabels()" title="Labels ein/aus">Labels</button>
+
+  <div class="spacer"></div>
+  <span id="item-counter">—</span>
+
+  <div class="tb-sep"></div>
+  <button class="nav-btn tb-btn" onclick="navigate(-1)">◀</button>
+  <button class="nav-btn tb-btn" onclick="navigate(1)">▶</button>
+</div>
+
+<!-- ── MAIN SPLIT ────────────────────────────── -->
+<div id="main-split">
+
+  <!-- LEFT: file list -->
+  <div id="left-panel">
+    <div id="left-header">
+      <div class="panel-title">Dateien</div>
+      <input type="text" id="file-search" placeholder="Suche…" oninput="filterFileList(this.value)">
+    </div>
+    <div id="file-list">
+      <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Keine Daten geladen</div>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resize-left"></div>
+
+  <!-- CENTER: media + canvas -->
+  <div id="center-panel">
+    <div id="media-stage">
+      <div id="stage-placeholder">
+        <div class="ph-icon">&#128269;</div>
+        <div class="ph-text">JSON laden und Datei auswählen</div>
+      </div>
+
+      <div id="stage-media-wrap" style="display:none; position:relative;">
+        <img id="stage-img" alt="">
+        <video id="stage-video" muted controls></video>
+        <svg id="box-svg" style="display:none"></svg>
+      </div>
+
+      <div id="stage-filename" style="display:none"></div>
+
+      <div id="nav-arrows">
+        <button class="arrow-btn" onclick="navigate(-1)">&#8249;</button>
+        <button class="arrow-btn" onclick="navigate(1)">&#8250;</button>
+      </div>
+    </div>
+
+    <!-- bottom: detection table -->
+    <div id="bottom-panel">
+      <div id="bottom-header">
+        <div class="panel-title">Detektionen</div>
+        <span id="det-count-badge">0 Treffer</span>
+      </div>
+      <div id="det-table-wrap">
+        <table class="det-table">
+          <thead>
+            <tr>
+              <th style="width:28px">#</th>
+              <th>Klasse</th>
+              <th style="min-width:160px">Konfidenz</th>
+              <th>Bounding Box</th>
+            </tr>
+          </thead>
+          <tbody id="det-tbody">
+            <tr><td colspan="4" class="det-empty">Keine Detektionen</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resize-right"></div>
+
+  <!-- RIGHT: class legend -->
+  <div id="right-panel">
+    <div id="right-header">
+      <div class="panel-title">Klassen</div>
+    </div>
+    <div id="legend-list">
+      <div style="padding:14px;text-align:center;color:var(--text3);font-size:10px;">Wird nach dem Laden befüllt</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="sb-item"><strong>Datei:</strong><span id="sb-file">—</span></div>
+  <div class="sb-item"><strong>Typ:</strong><span id="sb-type">—</span></div>
+  <div class="sb-item"><strong>Detektionen:</strong><span id="sb-dets">0</span></div>
+  <div class="sb-item"><strong>Score-Filter:</strong><span id="sb-filter">&gt;=0.30</span></div>
+  <div class="sb-item"><strong>Geladen:</strong><span id="sb-total">0 Dateien</span></div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="box-tooltip"></div>
+
+<!-- LOAD OVERLAY -->
+<div id="load-overlay">
+  <div class="load-box">
+    <h3>Detection JSON laden</h3>
+    <p>Lade die von analyser.py erzeugte <code>ergebnisse.json</code></p>
+    <div class="load-drop-area" id="drop-area"
+         onclick="document.getElementById('json-file-input').click()"
+         ondragover="onDragOver(event)"
+         ondragleave="onDragLeave(event)"
+         ondrop="onDrop(event)">
+      <div class="drop-icon">&#128196;</div>
+      <div>Klicken oder JSON hierher ziehen</div>
+    </div>
+    <input type="file" id="json-file-input" accept=".json" style="display:none" onchange="onFileInputChange(this)">
+    <div style="margin-top:12px;">
+      <button class="tb-btn" onclick="closeLoadOverlay()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// CLASS → COLOR MAP
+// ================================================================
+const CLASS_COLORS = {
+  FEMALE_BREAST_EXPOSED:    '#ef4444',
+  FEMALE_BREAST_COVERED:    '#f97316',
+  FEMALE_GENITALIA_EXPOSED: '#dc2626',
+  FEMALE_GENITALIA_COVERED: '#ea580c',
+  MALE_GENITALIA_EXPOSED:   '#a855f7',
+  MALE_BREAST_EXPOSED:      '#8b5cf6',
+  BUTTOCKS_EXPOSED:         '#f59e0b',
+  BUTTOCKS_COVERED:         '#d97706',
+  ANUS_EXPOSED:             '#ec4899',
+  ANUS_COVERED:             '#db2777',
+  BELLY_EXPOSED:            '#06b6d4',
+  BELLY_COVERED:            '#0891b2',
+  ARMPITS_EXPOSED:          '#22c55e',
+  ARMPITS_COVERED:          '#16a34a',
+  FEET_EXPOSED:             '#84cc16',
+  FEET_COVERED:             '#65a30d',
+  FACE_FEMALE:              '#4db3ff',
+  FACE_MALE:                '#60a5fa',
+};
+
+function classColor(cls) {
+  return CLASS_COLORS[cls] || '#888888';
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ================================================================
+// STATE
+// ================================================================
+let jsonData      = [];       // raw loaded array from ergebnisse.json
+let filteredItems = [];       // after class filter + conf threshold
+let currentIndex  = 0;
+let minConf       = 0.30;
+let activeClass   = 'ALL';
+let showBoxes     = true;
+let showLabels    = true;
+let hiddenClasses = new Set();
+let hoveredRow    = -1;
+
+// ================================================================
+// JSON LOAD
+// ================================================================
+function openLoadOverlay() {
+  document.getElementById('load-overlay').classList.add('show');
+}
+function closeLoadOverlay() {
+  document.getElementById('load-overlay').classList.remove('show');
+}
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-area').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('drop-area').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-area').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) readJsonFile(file);
+}
+function onFileInputChange(input) {
+  if (input.files[0]) readJsonFile(input.files[0]);
+}
+
+function readJsonFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      // Support both array and single object
+      jsonData = Array.isArray(raw) ? raw : [raw];
+      closeLoadOverlay();
+      afterLoad();
+    } catch(err) {
+      alert('JSON-Parsing fehlgeschlagen: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function afterLoad() {
+  currentIndex = 0;
+  buildClassFilterPills();
+  buildLegend();
+  applyFilters();
+  renderFileList();
+  document.getElementById('sb-total').textContent = jsonData.length + ' Dateien';
+}
+
+// ================================================================
+// FILTERING
+// ================================================================
+function onConfChange(val) {
+  minConf = val / 100;
+  document.getElementById('conf-val').textContent = minConf.toFixed(2);
+  document.getElementById('sb-filter').textContent = '>=' + minConf.toFixed(2);
+  applyFilters();
+  redrawCanvas();
+}
+
+function setClassFilter(cls) {
+  activeClass = cls;
+  document.querySelectorAll('#class-filter-pills .pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.cls === cls);
+  });
+  applyFilters();
+}
+
+function applyFilters() {
+  filteredItems = jsonData.filter(item => {
+    const dets = getDetections(item);
+    if (activeClass === 'ALL') return true;
+    return dets.some(d => d.class === activeClass && d.score >= minConf);
+  });
+  renderFileList();
+  updateCounter();
+  if (currentIndex >= filteredItems.length) currentIndex = 0;
+  loadItem(currentIndex);
+}
+
+// Get detections for an item respecting conf threshold
+function getDetections(item, overrideConf) {
+  const threshold = overrideConf !== undefined ? overrideConf : minConf;
+  if (!item || !item.analysis) return [];
+  let dets = [];
+  if (item.type === 'image') {
+    dets = item.analysis.labels || [];
+  } else if (item.type === 'video') {
+    // Flatten all frame detections + deduplicate for overlay
+    // For table: show top_labels with max_score
+    dets = (item.analysis.top_labels || []).map(l => ({
+      class: l.class,
+      score: l.max_score,
+      box: null,
+    }));
+  }
+  return dets.filter(d => d.score >= threshold);
+}
+
+// All detections for current item at current conf (with boxes)
+function getDetectionsWithBoxes(item) {
+  if (!item || !item.analysis) return [];
+  if (item.type === 'image') {
+    return (item.analysis.labels || []).filter(d => d.score >= minConf);
+  }
+  // Video: return flattened frame detections with box info
+  const results = [];
+  const frames = item.analysis.frames || [];
+  for (const frame of frames) {
+    for (const d of (frame.labels || [])) {
+      if (d.score >= minConf) {
+        results.push({ ...d, _frame: frame.frame, _ts: frame.timestamp_sec });
+      }
+    }
+  }
+  return results;
+}
+
+// ================================================================
+// CLASS FILTER PILLS + LEGEND
+// ================================================================
+function buildClassFilterPills() {
+  const counts = {};
+  for (const item of jsonData) {
+    const dets = (item.type === 'image'
+      ? (item.analysis?.labels || [])
+      : (item.analysis?.top_labels || []).map(l => ({ class: l.class, score: l.max_score }))
+    );
+    for (const d of dets) {
+      if (d.score >= minConf) counts[d.class] = (counts[d.class] || 0) + 1;
+    }
+  }
+  const container = document.getElementById('class-filter-pills');
+  container.innerHTML = '<button class="pill active" data-cls="ALL" onclick="setClassFilter(\'ALL\')">Alle</button>';
+  Object.entries(counts).sort((a,b) => b[1]-a[1]).forEach(([cls, cnt]) => {
+    const p = document.createElement('button');
+    p.className = 'pill';
+    p.dataset.cls = cls;
+    p.onclick = () => setClassFilter(cls);
+    const color = classColor(cls);
+    p.style.borderColor = color + '55';
+    p.style.color = color;
+    p.textContent = cls.replace(/_/g,' ') + ' (' + cnt + ')';
+    container.appendChild(p);
+  });
+}
+
+function buildLegend() {
+  const counts = {};
+  for (const item of jsonData) {
+    const dets = (item.type === 'image'
+      ? (item.analysis?.labels || [])
+      : (item.analysis?.top_labels || []).map(l => ({ class: l.class, score: l.max_score }))
+    );
+    for (const d of dets) {
+      counts[d.class] = (counts[d.class] || 0) + 1;
+    }
+  }
+  const list = document.getElementById('legend-list');
+  list.innerHTML = '';
+  Object.entries(counts).sort((a,b) => b[1]-a[1]).forEach(([cls, cnt]) => {
+    const color = classColor(cls);
+    const el = document.createElement('div');
+    el.className = 'legend-item';
+    el.innerHTML = `
+      <div class="legend-dot" style="background:${color}"></div>
+      <span class="legend-name" title="${cls}">${cls.replace(/_/g,' ')}</span>
+      <span class="legend-cnt">${cnt}</span>
+    `;
+    el.onclick = () => toggleLegendClass(cls, el);
+    list.appendChild(el);
+  });
+}
+
+function toggleLegendClass(cls, el) {
+  if (hiddenClasses.has(cls)) {
+    hiddenClasses.delete(cls);
+    el.classList.remove('dimmed');
+  } else {
+    hiddenClasses.add(cls);
+    el.classList.add('dimmed');
+  }
+  redrawCanvas();
+  renderDetTable();
+}
+
+// ================================================================
+// FILE LIST
+// ================================================================
+let fileSearchQuery = '';
+
+function filterFileList(q) {
+  fileSearchQuery = q.trim().toLowerCase();
+  renderFileList();
+}
+
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '';
+
+  const items = filteredItems.filter(item =>
+    !fileSearchQuery || (item.filename || '').toLowerCase().includes(fileSearchQuery)
+  );
+
+  if (!items.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:10px;">Keine Treffer</div>';
+    return;
+  }
+
+  items.forEach((item, idx) => {
+    const dets = getDetections(item);
+    const maxScore = dets.length ? Math.max(...dets.map(d => d.score)) : 0;
+    const color = maxScore > 0 ? classColor(dets.sort((a,b)=>b.score-a.score)[0].class) : '#333';
+
+    const el = document.createElement('div');
+    el.className = 'file-item' + (idx === currentIndex ? ' active' : '');
+    el.onclick = () => { currentIndex = idx; loadItem(idx); renderFileList(); };
+
+    const isVideo = item.type === 'video';
+    el.innerHTML = `
+      <div class="file-thumb">${isVideo ? '&#127910;' : '&#128247;'}</div>
+      <div class="file-info">
+        <div class="file-name" title="${item.filename || ''}">${item.filename || '—'}</div>
+        <div class="file-bar">
+          <div class="file-bar-fill" style="width:${Math.round(maxScore*100)}%;background:${color}"></div>
+        </div>
+        <div class="file-det-count ${dets.length ? 'has-hits' : ''}">${dets.length} Treffer</div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function updateCounter() {
+  const el = document.getElementById('item-counter');
+  const total = jsonData.length;
+  const shown = filteredItems.length;
+  el.innerHTML = `<strong>${shown}</strong> / ${total} Dateien`;
+}
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+function navigate(dir) {
+  if (!filteredItems.length) return;
+  currentIndex = (currentIndex + dir + filteredItems.length) % filteredItems.length;
+  loadItem(currentIndex);
+  renderFileList();
+}
+
+// ================================================================
+// LOAD ITEM INTO STAGE
+// ================================================================
+function loadItem(idx) {
+  const item = filteredItems[idx];
+  if (!item) return;
+
+  const wrap = document.getElementById('stage-media-wrap');
+  const placeholder = document.getElementById('stage-placeholder');
+  const img = document.getElementById('stage-img');
+  const video = document.getElementById('stage-video');
+  const fnBar = document.getElementById('stage-filename');
+
+  placeholder.style.display = 'none';
+  wrap.style.display = 'inline-block';
+  fnBar.style.display = 'block';
+  fnBar.textContent = item.filename || '';
+
+  // Status bar
+  document.getElementById('sb-file').textContent = item.filename || '—';
+  document.getElementById('sb-type').textContent = item.type || '—';
+
+  const filePath = item.file || item.path || '';
+  const fileUrl = buildFileUrl(filePath);
+
+  if (item.type === 'image') {
+    img.style.display = 'block';
+    video.style.display = 'none';
+    img.onload = () => { fitCanvas(); redrawCanvas(); };
+    img.onerror = () => { img.alt = 'Bild nicht gefunden'; };
+    img.src = fileUrl;
+  } else {
+    // Video: show first frame or just show video element
+    img.style.display = 'none';
+    video.style.display = 'block';
+    video.src = fileUrl;
+    video.onloadedmetadata = () => { fitCanvas(); redrawCanvas(); };
+    video.ontimeupdate = () => redrawCanvas();
+  }
+
+  renderDetTable();
+}
+
+function buildFileUrl(rawPath) {
+  if (!rawPath) return '';
+  if (rawPath.startsWith('file://')) return rawPath;
+  let normalized = rawPath.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  const encoded = parts.map(part => part.endsWith(':') ? part : encodeURIComponent(part)).join('/');
+  return `file:///${encoded}`;
+}
+
+// ================================================================
+// SVG OVERLAY + BOUNDING BOXES
+// ================================================================
+
+function fitCanvas() {
+  // No-op: SVG scales automatically via viewBox
+}
+
+function redrawCanvas() {
+  const svg = document.getElementById('box-svg');
+  svg.innerHTML = '';
+
+  if (!showBoxes) { svg.style.display = 'none'; return; }
+
+  const item = filteredItems[currentIndex];
+  if (!item) { svg.style.display = 'none'; return; }
+
+  let dets = getDetectionsWithBoxes(item).filter(d => !hiddenClasses.has(d.class));
+  if (!dets.length) { svg.style.display = 'none'; return; }
+
+  const isVideo = item.type === 'video';
+  const mediaEl = isVideo ? document.getElementById('stage-video') : document.getElementById('stage-img');
+
+  const natW = isVideo ? (mediaEl.videoWidth || 1) : (mediaEl.naturalWidth || 1);
+  const natH = isVideo ? (mediaEl.videoHeight || 1) : (mediaEl.naturalHeight || 1);
+
+  // viewBox matches the original image coordinate space — browser scales automatically
+  svg.setAttribute('viewBox', `0 0 ${natW} ${natH}`);
+  // xMidYMid meet = same as object-fit:contain — SVG scales/centers exactly like the <img>
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.style.display = 'block';
+
+  dets.forEach((d, i) => {
+    if (!d.box) return;
+    const [bx, by, bw, bh] = d.box;
+    const color = classColor(d.class);
+    const isHovered = hoveredRow === i;
+    const alpha = isHovered ? 0.35 : 0.15;
+    const strokeW = isHovered ? (1.5 + d.score * 3) * (natW / 800) : (1 + d.score * 2) * (natW / 800);
+
+    // Fill rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', bx); rect.setAttribute('y', by);
+    rect.setAttribute('width', bw); rect.setAttribute('height', bh);
+    rect.setAttribute('fill', hexToRgba(color, alpha));
+    rect.setAttribute('stroke', color);
+    rect.setAttribute('stroke-width', strokeW);
+    svg.appendChild(rect);
+
+    // Confidence arc (circle in corner)
+    const r = natW * 0.018;
+    const cx = bx + bw; const cy = by;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', hexToRgba(color, 0.8));
+    svg.appendChild(circle);
+
+    const arcText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    arcText.setAttribute('x', cx); arcText.setAttribute('y', cy);
+    arcText.setAttribute('text-anchor', 'middle');
+    arcText.setAttribute('dominant-baseline', 'central');
+    arcText.setAttribute('font-size', r * 0.9);
+    arcText.setAttribute('font-weight', 'bold');
+    arcText.setAttribute('fill', '#fff');
+    arcText.setAttribute('font-family', 'Segoe UI, sans-serif');
+    arcText.textContent = Math.round(d.score * 100);
+    svg.appendChild(arcText);
+
+    if (showLabels) {
+      const label = d.class.replace(/_/g, ' ') + ' ' + Math.round(d.score * 100) + '%';
+      const fs = natW * 0.016;
+      const lx = bx + 2;
+      const ly = by > fs * 1.6 ? by - fs * 0.4 : by + bh + fs * 1.2;
+
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', lx - 2); bg.setAttribute('y', ly - fs * 1.1);
+      bg.setAttribute('width', label.length * fs * 0.6 + 6); bg.setAttribute('height', fs * 1.4);
+      bg.setAttribute('fill', hexToRgba(color, 0.85));
+      bg.setAttribute('rx', 2);
+      svg.appendChild(bg);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', lx + 1); text.setAttribute('y', ly);
+      text.setAttribute('font-size', fs);
+      text.setAttribute('font-weight', 'bold');
+      text.setAttribute('fill', '#fff');
+      text.setAttribute('font-family', 'Segoe UI, sans-serif');
+      text.textContent = label;
+      svg.appendChild(text);
+    }
+  });
+
+  dets.forEach((d, i) => {
+    if (!d.box) return;
+    const [bx, by, bw, bh] = d.box;
+    const x = bx * scaleX;
+    const y = by * scaleY;
+    const w = bw * scaleX;
+    const h = bh * scaleY;
+
+    const color = classColor(d.class);
+    const alpha = hoveredRow === i ? 0.6 : 0.25;
+    const lineW = hoveredRow === i ? 2.5 : 1.5;
+
+    // Fill
+    ctx.fillStyle = hexToRgba(color, alpha * 0.5);
+    ctx.fillRect(x, y, w, h);
+
+    // Border — width encodes confidence
+    const pct = d.score;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW + pct * 2;
+    ctx.strokeRect(x, y, w, h);
+
+    // Confidence arc on corner
+    drawConfArc(ctx, x + w, y, 14, pct, color);
+
+    // Label
+    if (showLabels) {
+      const label = d.class.replace(/_/g,' ') + ' ' + Math.round(pct * 100) + '%';
+      ctx.font = 'bold 10px Segoe UI, sans-serif';
+      const tw = ctx.measureText(label).width;
+      const lx = Math.min(x, dispW - tw - 6);
+      const ly = y > 18 ? y - 5 : y + h + 13;
+
+      ctx.fillStyle = hexToRgba(color, 0.85);
+      ctx.fillRect(lx - 2, ly - 11, tw + 6, 14);
+
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, lx + 1, ly);
+    }
+  });
+}
+
+
+
+// ================================================================
+// DETECTION TABLE
+// ================================================================
+function renderDetTable() {
+  const item = filteredItems[currentIndex];
+  const tbody = document.getElementById('det-tbody');
+  const badge = document.getElementById('det-count-badge');
+
+  if (!item) {
+    tbody.innerHTML = '<tr><td colspan="4" class="det-empty">Keine Datei ausgewählt</td></tr>';
+    badge.textContent = '0 Treffer';
+    badge.classList.remove('has-hits');
+    document.getElementById('sb-dets').textContent = '0';
+    return;
+  }
+
+  let dets = getDetectionsWithBoxes(item).filter(d => !hiddenClasses.has(d.class));
+
+  badge.textContent = dets.length + ' Treffer';
+  badge.classList.toggle('has-hits', dets.length > 0);
+  document.getElementById('sb-dets').textContent = dets.length;
+
+  if (!dets.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="det-empty">Keine Detektionen über dem Schwellenwert</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  dets.sort((a,b) => b.score - a.score).forEach((d, i) => {
+    const color = classColor(d.class);
+    const pct = Math.round(d.score * 100);
+    const box = d.box ? d.box.join(', ') : (d._frame ? `Frame ${d._frame} (${d._ts}s)` : '—');
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td style="color:var(--text3)">${i+1}</td>
+      <td>
+        <span class="class-pill" style="background:${hexToRgba(color,0.15)};color:${color};border:1px solid ${hexToRgba(color,0.4)}">
+          ${d.class.replace(/_/g, ' ')}
+        </span>
+      </td>
+      <td>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar">
+            <div class="conf-bar-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <span class="conf-pct" style="color:${color}">${pct}%</span>
+        </div>
+      </td>
+      <td class="box-coord">${box}</td>
+    `;
+
+    tr.addEventListener('mouseenter', () => {
+      hoveredRow = i;
+      redrawCanvas();
+      tr.classList.add('highlighted');
+    });
+    tr.addEventListener('mouseleave', () => {
+      hoveredRow = -1;
+      redrawCanvas();
+      tr.classList.remove('highlighted');
+    });
+    tr.addEventListener('click', () => {
+      // scroll canvas to box area
+      highlightBox(i);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function highlightBox(idx) {
+  // Flash the box
+  hoveredRow = idx;
+  redrawCanvas();
+  setTimeout(() => { hoveredRow = -1; redrawCanvas(); }, 1200);
+}
+
+// ================================================================
+// TOGGLES
+// ================================================================
+function toggleBoxes() {
+  showBoxes = !showBoxes;
+  document.getElementById('btn-boxes').classList.toggle('active', showBoxes);
+  redrawCanvas();
+}
+function toggleLabels() {
+  showLabels = !showLabels;
+  document.getElementById('btn-labels').classList.toggle('active', showLabels);
+  redrawCanvas();
+}
+
+// ================================================================
+// RESIZE HANDLES
+// ================================================================
+function initResizeHandles() {
+  makeResizable('resize-left', 'left-panel', 'width', 180, 480);
+}
+
+function makeResizable(handleId, panelId, prop, min, max) {
+  const handle = document.getElementById(handleId);
+  const panel  = document.getElementById(panelId);
+  let dragging = false;
+  let startX, startSize;
+
+  handle.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startSize = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    const newSize = Math.max(min, Math.min(max, startSize + delta));
+    panel.style.width = newSize + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+  });
+}
+
+// ================================================================
+// KEYBOARD
+// ================================================================
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowLeft'  || e.key === 'a') navigate(-1);
+  if (e.key === 'ArrowRight' || e.key === 'd') navigate(1);
+  if (e.key === 'b') toggleBoxes();
+  if (e.key === 'l') toggleLabels();
+});
+
+// ================================================================
+// RESIZE OBSERVER: refit canvas when window resizes
+// ================================================================
+const ro = new ResizeObserver(() => { redrawCanvas(); });
+ro.observe(document.getElementById('center-panel'));
+
+// ================================================================
+// ALSO try to get items from parent AppState (like other views)
+// ================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-boxes').classList.add('active');
+  document.getElementById('btn-labels').classList.add('active');
+
+  initResizeHandles();
+
+  // Try parent AppState integration
+  try {
+    const state = window.parent?.AppState?.getInstance?.();
+    if (state) {
+      const items = state.getMediaItems?.() || [];
+      // If parent has detection data attached, use it
+      const withDet = items.filter(i => i.nudenet || i.detection || i.analysis);
+      if (withDet.length) {
+        jsonData = withDet.map(i => ({
+          file: i.path,
+          filename: i.fileName,
+          type: i.type,
+          analysis: i.nudenet || i.detection || i.analysis,
+        }));
+        afterLoad();
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // Otherwise show load overlay automatically
+  openLoadOverlay();
+});
+</script>
+</body>
+</html>

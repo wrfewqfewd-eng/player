@@ -217,6 +217,7 @@
     <button class="tab-btn" id="tab-grid" data-view="grid" onclick="switchView('grid')" disabled>▦ Grid</button>
     <button class="tab-btn" id="tab-detail" data-view="detail" onclick="switchView('detail')" disabled>☰ Detail</button>
     <button class="tab-btn" id="tab-label" data-view="label" onclick="switchView('label')" disabled>🏷️ Labels</button>
+    <button class="tab-btn" id="tab-detection" data-view="detection" onclick="switchView('detection')">&#128269; Detection</button>
   </div>
 
   <div class="topbar-sep"></div>
@@ -289,8 +290,11 @@
   <iframe id="view-detail" class="view-frame" src="detail-view.html"></iframe>
 
   <!-- Label-Tab -->
-   <iframe id="view-label" class="view-frame" src="label-view.html"></iframe>
-</div>
+  <iframe id="view-label" class="view-frame" src="label-view.html"></iframe>
+
+  <!-- Detection-Tab -->
+  <iframe id="view-detection" class="view-frame" src="detection-view.html"></iframe>
+  </div>
 
 <!-- Loading Overlay (JSON-Vorbereitung) -->
 <div id="loading-overlay">
@@ -430,6 +434,9 @@ function switchView(viewName) {
     document.getElementById('view-detail').classList.add('active');
   } else if (viewName === 'label') {
   document.getElementById('view-label').classList.add('active');
+  } else if (viewName === 'detection') {
+  document.getElementById('view-detection').classList.add('active');
+}
   }
 
   // Tab-Buttons aktualisieren
@@ -442,14 +449,15 @@ function switchView(viewName) {
 
   // Grid-Einstellungen nur im Grid-Tab zeigen
   document.getElementById('grid-settings').style.display = viewName === 'grid' ? 'flex' : 'none';
-}
+
 
 // ==================== TABS FREISCHALTEN ====================
 function unlockMediaTabs() {
   const has = state.getMediaItems().length > 0;
   document.getElementById('tab-grid').disabled = !has;
   document.getElementById('tab-detail').disabled = !has;
-    document.getElementById('tab-label').disabled = !has;
+  document.getElementById('tab-label').disabled = !has;
+  document.getElementById('tab-detection').disabled = !has;
 }
 
 // ==================== TOPBAR BADGES ====================
